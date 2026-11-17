@@ -8,7 +8,6 @@ the owner changed several things after trying the app (listed under "Decisions")
 - Run: `launch.bat` (creates `.venv`, installs `requirements.txt`, starts `pythonw -m app`).
   With a console and logs: `.venv\Scripts\python -m app`. Data: `%APPDATA%\FocusStart\` (`app.log` there).
 - Tests (core only, no Qt): `.venv\Scripts\python -m pip install -r requirements-dev.txt`, then `.venv\Scripts\python -m pytest`.
-- Load diagnosis: `diagnose.bat` writes `diagnose.txt` (which Qt module/DLL fails, which runtime/ICU DLL copies are on PATH).
 - After any QML change, run the app and check `app.log` for QML warnings (binding loops, null refs).
 
 ## Architecture

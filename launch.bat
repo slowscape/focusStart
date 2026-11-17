@@ -40,7 +40,7 @@ exit /b 0
 :loadfail
 echo.
 echo PySide6 installed, but Windows couldn't load its Qt files.
-echo Run diagnose.bat and send the diagnose.txt it creates.
+echo Delete the .venv folder next to launch.bat and run launch.bat again.
 echo.
 pause
 exit /b 1

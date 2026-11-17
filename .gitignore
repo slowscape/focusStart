@@ -4,7 +4,6 @@ __pycache__/
 .pytest_cache/
 
 # Local output that can contain personal paths/data
-diagnose.txt
 *.log
 data.json
 backups/
