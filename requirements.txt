@@ -1,0 +1,10 @@
+# Only the two PySide6 wheels this app uses (the "PySide6" meta-package also pulls in
+# WebEngine and Pdf, ~135 MB, which FocusStart never imports).
+#
+# Kept below 6.10: from 6.10 on, Qt6Core.dll links to Windows' own icuuc.dll
+# (ucnv_open etc.). On PCs where that system file is only a stub or an incomplete
+# copy (e.g. older Windows 10 builds, or another program's icuuc.dll on PATH), Qt
+# fails to load with "The procedure entry point ucnv_open could not be located".
+# 6.9.x doesn't import ICU at all.
+PySide6-Essentials>=6.8,<6.10
+PySide6-Addons>=6.8,<6.10

@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Local output that can contain personal paths/data
+diagnose.txt
+*.log
+data.json
+backups/
+*.pdf
