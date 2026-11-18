@@ -37,6 +37,30 @@ def events(data: AppData) -> list[HistoryEvent]:
     return out
 
 
+@dataclass
+class Totals:
+    label: str
+    tasks: int
+    steps: int
+
+
+def totals(data: AppData, today: date, week_starts: str = "monday") -> list[Totals]:
+    """Finished tasks and steps: this week, this month, this year, all time."""
+    from .dates import local_date_of, week_start
+    windows = [("This week", week_start(today, week_starts)), ("This month", today.replace(day=1)),
+               ("This year", today.replace(month=1, day=1)), ("All time", date.min)]
+    counts = [[0, 0] for _ in windows]
+    for t in data.tasks:
+        stamps = [(local_date_of(s.done_at), 1) for s in t.steps if s.done_at]
+        if t.completed_at:
+            stamps.append((local_date_of(t.completed_at), 0))
+        for d, is_step in stamps:
+            for i, (_, start) in enumerate(windows):
+                if start <= d <= today or (start == date.min and d is not None):
+                    counts[i][is_step] += 1
+    return [Totals(label, c[0], c[1]) for (label, _), c in zip(windows, counts)]
+
+
 def day_label(d: date, today: date) -> str:
     delta = (today - d).days
     if delta == 0:

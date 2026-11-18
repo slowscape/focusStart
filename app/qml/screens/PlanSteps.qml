@@ -39,7 +39,7 @@ Item {
             Label {
                 Layout.fillWidth: true
                 text: screen.info.title || ""
-                elide: Text.ElideRight
+                wrapMode: Text.Wrap
                 color: Theme.subtext
             }
         }

@@ -58,9 +58,10 @@ class Step:
     order: int
     created_at: str
     done_at: str | None = None
+    notes: str = ""
     extra: dict = field(default_factory=dict)
 
-    KEYS = {"id", "text", "order", "created_at", "done_at"}
+    KEYS = {"id", "text", "order", "created_at", "done_at", "notes"}
 
     @property
     def done(self) -> bool:
@@ -74,6 +75,7 @@ class Step:
             order=int(d.get("order", 0)),
             created_at=_check_ts(_req_str(d, "created_at")),
             done_at=_check_ts(_opt_str(d, "done_at")),
+            notes=d.get("notes") if isinstance(d.get("notes"), str) else "",
             extra=_split(d, cls.KEYS),
         )
 
@@ -81,6 +83,8 @@ class Step:
         out = dict(self.extra)
         out.update(id=self.id, text=self.text, order=self.order,
                    created_at=self.created_at, done_at=self.done_at)
+        if self.notes:
+            out["notes"] = self.notes
         return out
 
 
@@ -115,6 +119,17 @@ class Task:
     @property
     def completed_open(self) -> bool:
         return bool(self.extra.get("completed_open", False))
+
+    @property
+    def tag_ids(self) -> list[str]:
+        v = self.extra.get("tags")
+        return [x for x in v if isinstance(x, str)] if isinstance(v, list) else []
+
+    @property
+    def repeat(self) -> str:
+        """"" or one of dates.REPEATS (stored as extra.repeat)."""
+        v = self.extra.get("repeat")
+        return v if isinstance(v, str) else ""
 
     @property
     def pomodoro_on(self) -> bool:
@@ -182,6 +197,46 @@ class TaskList:
         return out
 
 
+# Tag colours: friendly, distinct, readable on light and dark. (No red: SPEC section 9.)
+TAG_COLORS = ["#4f8ff7", "#2bb3a3", "#5cb85c", "#e0b028", "#f0883e", "#a371f7", "#e86bb0", "#8b949e"]
+
+
+@dataclass
+class Tag:
+    id: str
+    name: str
+    color: str = TAG_COLORS[0]
+    order: int = 0
+    extra: dict = field(default_factory=dict)
+
+    KEYS = {"id", "name", "color", "order"}
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "Tag":
+        color = d.get("color") if isinstance(d.get("color"), str) else TAG_COLORS[0]
+        return cls(id=_req_str(d, "id"), name=_req_str(d, "name"), color=color,
+                   order=int(d.get("order", 0)), extra=_split(d, cls.KEYS))
+
+    def to_dict(self) -> dict:
+        out = dict(self.extra)
+        out.update(id=self.id, name=self.name, color=self.color, order=self.order)
+        return out
+
+
+BACKGROUND_INTERVALS = (5, 15, 60, 1440)   # minutes; 1440 = once a day
+
+
+def clean_background(d) -> dict:
+    out = {"enabled": False, "folder": "", "interval": 15}
+    if isinstance(d, dict):
+        out["enabled"] = bool(d.get("enabled", False))
+        if isinstance(d.get("folder"), str):
+            out["folder"] = d["folder"]
+        if d.get("interval") in BACKGROUND_INTERVALS:
+            out["interval"] = d["interval"]
+    return out
+
+
 @dataclass
 class Settings:
     sound: bool = True
@@ -192,12 +247,13 @@ class Settings:
     days_completed: list[str] = field(default_factory=list)
     window: dict | None = None
     pomodoro: dict = field(default_factory=lambda: clean_pomodoro(None))
+    background: dict = field(default_factory=lambda: clean_background(None))
     extra: dict = field(default_factory=dict)
 
     # Old files may still hold "last_recap_date"/"recap_history" (recap screen removed);
     # like any unknown key they are kept in extra.
     KEYS = {"sound", "volume", "effects", "week_starts",
-            "day_progress", "days_completed", "window", "pomodoro"}
+            "day_progress", "days_completed", "window", "pomodoro", "background"}
 
     @classmethod
     def from_dict(cls, d: dict) -> "Settings":
@@ -222,6 +278,7 @@ class Settings:
         if isinstance(w, dict) and all(isinstance(w.get(k), (int, float)) for k in ("x", "y", "w", "h")):
             s.window = {k: int(w[k]) for k in ("x", "y", "w", "h")}
         s.pomodoro = clean_pomodoro(d.get("pomodoro"))
+        s.background = clean_background(d.get("background"))
         s.extra = _split(d, cls.KEYS)
         return s
 
@@ -231,7 +288,7 @@ class Settings:
                    week_starts=self.week_starts,
                    day_progress=dict(self.day_progress),
                    days_completed=list(self.days_completed), window=self.window,
-                   pomodoro=dict(self.pomodoro))
+                   pomodoro=dict(self.pomodoro), background=dict(self.background))
         return out
 
 
@@ -240,10 +297,11 @@ class AppData:
     settings: Settings = field(default_factory=Settings)
     lists: list[TaskList] = field(default_factory=list)
     tasks: list[Task] = field(default_factory=list)
+    tags: list[Tag] = field(default_factory=list)
     schema_version: int = SCHEMA_VERSION
     extra: dict = field(default_factory=dict)
 
-    KEYS = {"schema_version", "settings", "lists", "tasks"}
+    KEYS = {"schema_version", "settings", "lists", "tasks", "tags"}
 
     @classmethod
     def new(cls) -> "AppData":
@@ -255,12 +313,16 @@ class AppData:
             raise ValueError("root must be an object")
         lists = d.get("lists", [])
         tasks = d.get("tasks", [])
+        tags = d.get("tags", [])
         if not isinstance(lists, list) or not isinstance(tasks, list):
             raise ValueError("lists and tasks must be arrays")
+        if not isinstance(tags, list):
+            tags = []
         data = cls(
             settings=Settings.from_dict(d.get("settings") or {}),
             lists=[TaskList.from_dict(x) for x in lists],
             tasks=[Task.from_dict(x) for x in tasks],
+            tags=[Tag.from_dict(x) for x in tags if isinstance(x, dict)],
             schema_version=int(d.get("schema_version", SCHEMA_VERSION)),
             extra=_split(d, cls.KEYS),
         )
@@ -277,5 +339,6 @@ class AppData:
         out = dict(self.extra)
         out.update(schema_version=self.schema_version, settings=self.settings.to_dict(),
                    lists=[l.to_dict() for l in self.lists],
-                   tasks=[t.to_dict() for t in self.tasks])
+                   tasks=[t.to_dict() for t in self.tasks],
+                   tags=[g.to_dict() for g in self.tags])
         return out

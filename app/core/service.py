@@ -10,7 +10,7 @@ from typing import Any
 
 from . import dates, progress
 from .dates import Clock, local_date_of, parse_date, to_iso
-from .models import AppData, Step, Task, TaskList, new_id
+from .models import TAG_COLORS, AppData, Step, Tag, Task, TaskList, new_id
 
 _UNSET: Any = object()
 UNDO_KEEP = 30
@@ -28,6 +28,7 @@ class Completion:
     all_clear_again: bool         # day cleared again after it already fired today
     tasks_today: int = 0
     steps_today: int = 0
+    repeat_date: str | None = None  # a repeating task's next copy was planned for this date
 
 
 @dataclass
@@ -40,6 +41,7 @@ class _Undo:
     added_day: str | None
     prev_floor: float
     prev_floor_date: str | None
+    spawned_id: str | None = None # next copy of a repeating task, removed again on undo
 
 
 @dataclass
@@ -138,7 +140,7 @@ class Service:
         return max((t.order for t in self.data.tasks), default=-1) + 1
 
     def add_task(self, title: str, planned_date: date | str | None = None,
-                 list_id: str | None = None) -> Task:
+                 list_id: str | None = None, tag_ids: list[str] | None = None) -> Task:
         title = title.strip()
         if not title:
             raise ValueError("empty title")
@@ -146,6 +148,9 @@ class Service:
             list_id = self.default_list_id()
         t = Task(id=new_id(), list_id=list_id, title=title, created_at=self.now_iso(),
                  planned_date=self._date_str(planned_date), order=self._next_order())
+        tags = [i for i in (tag_ids or []) if self.tag_by_id(i)]
+        if tags:
+            t.extra["tags"] = list(dict.fromkeys(tags))
         self.data.tasks.append(t)
         self._changed()
         return t
@@ -175,6 +180,39 @@ class Service:
         self.data.tasks.remove(t)
         self._changed()
 
+    def reorder_tasks(self, ids: list[str]) -> None:
+        """The tasks in `ids` take this order. They are re-dealt into the order slots they
+        already hold, so tasks outside the view (other lists, other days) keep their places."""
+        tasks = [t for t in (self.task(i) for i in dict.fromkeys(ids)) if t is not None]
+        slots = sorted(t.order for t in tasks)
+        for slot, t in zip(slots, tasks):
+            t.order = slot
+        self._changed()
+
+    def set_repeat(self, task_id: str, rule: str) -> None:
+        t = self._task(task_id)
+        if rule in dates.REPEATS:
+            t.extra["repeat"] = rule
+        else:
+            t.extra.pop("repeat", None)
+        self._changed()
+
+    def _spawn_repeat(self, t: Task) -> Task | None:
+        """Plan the next copy of a repeating task: same title, list, notes, tags and steps
+        (unchecked, notes kept), on its next date."""
+        if not t.repeat:
+            return None
+        nxt = dates.next_occurrence(t.repeat, parse_date(t.planned_date), self.today())
+        extra = {k: v for k, v in t.extra.items() if k != "completed_open"}
+        copy = Task(id=new_id(), list_id=t.list_id, title=t.title, created_at=self.now_iso(),
+                    notes=t.notes, planned_date=nxt.isoformat(), order=self._next_order(),
+                    extra=extra)
+        for s in t.steps_in_order:
+            copy.steps.append(Step(id=new_id(), text=s.text, order=s.order,
+                                   created_at=copy.created_at, notes=s.notes))
+        self.data.tasks.append(copy)
+        return copy
+
     # ---------- steps ----------
     def add_step(self, task_id: str, text: str) -> Step:
         text = text.strip()
@@ -194,6 +232,12 @@ class Service:
         s = self._task(task_id).step(step_id)
         if s and text:
             s.text = text
+            self._changed()
+
+    def set_step_notes(self, task_id: str, step_id: str, notes: str) -> None:
+        s = self._task(task_id).step(step_id)
+        if s is not None and s.notes != notes:
+            s.notes = notes
             self._changed()
 
     def delete_step(self, task_id: str, step_id: str) -> None:
@@ -236,6 +280,7 @@ class Service:
     def _finish(self, kind: str, t: Task, step: Step | None, ts: str, completed_task: bool,
                 step_index: int, remaining_before: int, first_task: bool,
                 prev_floor: float, prev_floor_date: str | None) -> Completion:
+        spawned = self._spawn_repeat(t) if completed_task else None
         p = self.progress()
         today = self.today().isoformat()
         s = self.data.settings
@@ -249,11 +294,13 @@ class Service:
             else:
                 all_clear = True
         token = self._remember(_Undo(kind, t.id, step.id if step else None, ts, completed_task,
-                                     added_day, prev_floor, prev_floor_date))
+                                     added_day, prev_floor, prev_floor_date,
+                                     spawned.id if spawned else None))
         self._changed()
         return Completion(token, t.id, step.id if step else None, completed_task, step_index,
                           first_task and completed_task, day_complete, all_clear,
-                          p.tasks_done, p.steps_done)
+                          p.tasks_done, p.steps_done,
+                          spawned.planned_date if spawned else None)
 
     def _floor_snapshot(self) -> tuple[float, str | None]:
         dp = self.data.settings.day_progress
@@ -310,6 +357,10 @@ class Service:
             reopened = True
         elif rec.kind == "task":
             return UndoResult(False)
+        if rec.spawned_id:  # the repeat's next copy goes away with the completion
+            copy = self.task(rec.spawned_id)
+            if copy is not None and not copy.done:
+                self.data.tasks.remove(copy)
         revoked = False
         s = self.data.settings
         if rec.added_day and rec.added_day in s.days_completed:
@@ -386,6 +437,14 @@ class Service:
         self._changed()
         return l
 
+    def reorder_lists(self, ids: list[str]) -> None:
+        order = {i: n for n, i in enumerate(dict.fromkeys(ids))}
+        rest = [l for l in self.lists() if l.id not in order]
+        for n, l in enumerate(sorted((l for l in self.data.lists if l.id in order),
+                                     key=lambda l: order[l.id]) + rest):
+            l.order = n
+        self._changed()
+
     def rename_list(self, list_id: str, name: str) -> None:
         l = self.list_by_id(list_id)
         if l and name.strip():
@@ -405,6 +464,72 @@ class Service:
             for t in owned:  # completed tasks move too, so history is kept
                 t.list_id = move_to
         self.data.lists.remove(l)
+        self._changed()
+
+    # ---------- tags ----------
+    def tags(self) -> list[Tag]:
+        return sorted(self.data.tags, key=lambda g: g.order)
+
+    def tag_by_id(self, tag_id: str) -> Tag | None:
+        return next((g for g in self.data.tags if g.id == tag_id), None)
+
+    def find_tag(self, name: str) -> Tag | None:
+        key = name.strip().casefold()
+        return next((g for g in self.tags() if g.name.casefold() == key), None) if key else None
+
+    def match_tags(self, query: str) -> list[Tag]:
+        q = query.strip().casefold()
+        tags = self.tags()
+        if not q:
+            return tags
+        starts = [g for g in tags if g.name.casefold().startswith(q)]
+        return starts + [g for g in tags if q in g.name.casefold() and g not in starts]
+
+    def add_tag(self, name: str, color: str | None = None) -> Tag:
+        name = name.strip()
+        if not name:
+            raise ValueError("empty name")
+        order = max((g.order for g in self.data.tags), default=-1) + 1
+        g = Tag(id=new_id(), name=name, order=order,
+                color=color or TAG_COLORS[len(self.data.tags) % len(TAG_COLORS)])
+        self.data.tags.append(g)
+        self._changed()
+        return g
+
+    def ensure_tag(self, name: str) -> Tag:
+        return self.find_tag(name) or self.add_tag(name)
+
+    def update_tag(self, tag_id: str, name: str | None = None, color: str | None = None) -> None:
+        g = self.tag_by_id(tag_id)
+        if g is None:
+            return
+        if name and name.strip():
+            g.name = name.strip()
+        if color:
+            g.color = color
+        self._changed()
+
+    def delete_tag(self, tag_id: str) -> None:
+        g = self.tag_by_id(tag_id)
+        if g is None:
+            return
+        self.data.tags.remove(g)
+        for t in self.data.tasks:
+            if tag_id in t.tag_ids:
+                rest = [i for i in t.tag_ids if i != tag_id]
+                if rest:
+                    t.extra["tags"] = rest
+                else:
+                    t.extra.pop("tags", None)
+        self._changed()
+
+    def set_task_tags(self, task_id: str, tag_ids: list[str]) -> None:
+        t = self._task(task_id)
+        ids = [i for i in dict.fromkeys(tag_ids) if self.tag_by_id(i)]
+        if ids:
+            t.extra["tags"] = ids
+        else:
+            t.extra.pop("tags", None)
         self._changed()
 
     # ---------- settings ----------

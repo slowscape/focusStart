@@ -3,7 +3,10 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import "../theme"
 
-// My Day card. Tap expands in place; play opens Focus; "..." opens the task menu.
+// Task card (My Day and Lists). Nothing is cut short: the card grows to show the whole
+// title and every remaining step. Click the title to open Focus (without starting the
+// timer); drag the title to reorder cards; drag a step's text to reorder steps.
+// Start (play) opens Focus and starts the timer; "..." opens the task menu.
 Rectangle {
     id: card
     required property string itemId
@@ -14,19 +17,26 @@ Rectangle {
     required property int stepDone
     required property int stepRemaining
     required property bool completedOpen
+    required property var tagColors
+    required property var tagNames
+    required property string repeat
     required property int index
-    property bool expanded: false
     readonly property var steps: backend.stepModel(itemId)
     readonly property var doneSteps: backend.doneStepModel(itemId)
     readonly property bool hasSteps: stepTotal > 0
+    // The screen hosting the list handles a drop (it knows which tasks are in view).
+    signal reorder(int from, int to)
 
     width: ListView.view ? ListView.view.width : 300
     implicitHeight: col.implicitHeight + 2 * Theme.s3
     height: implicitHeight
     radius: Theme.radius
     color: Theme.card
-    border.color: Theme.cardBorder
+    border.color: titleDrag.dragging ? Theme.accent : Theme.cardBorder
     clip: true
+    transform: Translate { y: titleDrag.offset }
+    scale: titleDrag.dragging ? 1.02 : 1
+    Behavior on scale { NumberAnimation { duration: Theme.durFast } }
 
     Rectangle {
         anchors.fill: parent; radius: parent.radius
@@ -59,23 +69,40 @@ Rectangle {
                 Layout.leftMargin: 2
                 Layout.rightMargin: 2
             }
+            TagDots {
+                colors: card.tagColors
+                names: card.tagNames
+                Layout.alignment: Qt.AlignTop
+                Layout.topMargin: 9
+            }
             Label {
+                id: titleLabel
                 Layout.fillWidth: true
                 Layout.alignment: Qt.AlignVCenter
-                text: card.title
+                text: card.title + (card.repeat !== "" ? "  ↻" : "")
                 wrapMode: Text.Wrap
-                maximumLineCount: card.expanded ? 6 : 2
-                elide: Text.ElideRight
                 font.pixelSize: Theme.fontBody + 1
                 font.weight: Font.DemiBold
-                TapHandler { onTapped: card.expanded = !card.expanded }
+                ReorderArea {
+                    id: titleDrag
+                    anchors.fill: parent
+                    row: card
+                    view: card.ListView.view
+                    index: card.index
+                    indicator: card.ListView.view ? (card.ListView.view.dropLine || null) : null
+                    onTapped: appWindow.openFocus(card.itemId, false, true)
+                    onDropped: (from, to) => card.reorder(from, to)
+                }
+                ToolTip.visible: titleDrag.containsMouse && !titleDrag.dragging
+                ToolTip.delay: 900
+                ToolTip.text: "Click to open · drag to move"
             }
             // Start and "..." sit together as one compact pair.
             RowLayout {
                 Layout.alignment: Qt.AlignTop
                 spacing: 0
                 IconButton {
-                    icon_: "play"; tip: "Start"
+                    icon_: "play"; tip: "Start (with timer)"
                     implicitWidth: 32
                     iconColor: Theme.accent
                     onClicked: appWindow.openFocus(card.itemId)
@@ -97,23 +124,20 @@ Rectangle {
             interactive: false
             visible: card.hasSteps
             model: card.steps
+            property Item dropLine: stepLine
             delegate: StepRow {
                 taskId: card.itemId
-                shown: card.expanded || index < 3
                 onCompleted: (checkItem) => appWindow.completeStep(card.itemId, itemId, checkItem, card)
+                onReorder: (from, to) => {
+                    var it = card.steps.get(from)
+                    if (it && it.id) backend.moveStep(card.itemId, it.id, to)
+                }
             }
             add: Transition { NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.durMed } }
             // No "displaced" transition: rows collapse their own height on removal, and the
             // rows below follow it. A displaced animation fights that collapse (rows jump up
             // behind the title, then drop back down).
-        }
-        Label {
-            visible: !card.expanded && card.stepRemaining > 3
-            text: "+" + (card.stepRemaining - 3) + " more"
-            color: Theme.subtext
-            font.pixelSize: Theme.fontSmall
-            Layout.leftMargin: 34
-            TapHandler { onTapped: card.expanded = true }
+            Rectangle { id: stepLine; visible: false; z: 50; width: parent.width; height: 2; radius: 1; color: Theme.accent }
         }
         // Completed steps, rolled up. Open/closed is remembered per task; new tasks start closed.
         AbstractButton {
@@ -148,6 +172,7 @@ Rectangle {
                     diameter: 18
                     done: true
                     allowUncheck: true
+                    Layout.alignment: Qt.AlignTop
                     onToggledOff: backend.restoreStep(card.itemId, parent.itemId)
                     ToolTip.visible: hovered
                     ToolTip.delay: 600
@@ -158,22 +183,9 @@ Rectangle {
                     text: parent.text
                     color: Theme.subtext
                     wrapMode: Text.Wrap
-                    maximumLineCount: 2
-                    elide: Text.ElideRight
                     font.pixelSize: Theme.fontBody
                 }
             }
-        }
-        Label {
-            visible: card.expanded && card.notes !== ""
-            Layout.fillWidth: true
-            Layout.topMargin: Theme.s1
-            text: card.notes
-            wrapMode: Text.Wrap
-            maximumLineCount: 4
-            elide: Text.ElideRight
-            color: Theme.subtext
-            font.pixelSize: Theme.fontSmall
         }
         Button {
             visible: !card.hasSteps

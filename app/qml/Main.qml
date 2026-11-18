@@ -22,6 +22,7 @@ ApplicationWindow {
     Binding { target: Theme; property: "windowColor"; value: appWindow.palette.window }
     Binding { target: Theme; property: "textColor"; value: appWindow.palette.windowText }
     Binding { target: Theme; property: "effects"; value: backend.effects }
+    Binding { target: Theme; property: "backdrop"; value: backend.bgImage !== "" }
 
     // ----------------------------------------------------------- navigation
     readonly property var tabs: ["myday", "upcoming", "lists", "history"]
@@ -60,11 +61,20 @@ ApplicationWindow {
         else { screenParams = {}; screen = lastTab }
         loader.load()
     }
-    function openFocus(taskId, replacePlan) {
+    // noTimer: opened by clicking a task's title (look/work without starting the Pomodoro).
+    function openFocus(taskId, replacePlan, noTimer) {
         lastFocusTaskId = taskId
-        backend.pomoAutoStart(taskId)   // the Start arrow starts (or resumes after a break) the Pomodoro timer
+        if (!noTimer) backend.pomoAutoStart(taskId)   // the Start arrow starts (or resumes after a break) the Pomodoro timer
         if (replacePlan && screen === "plan") { screenParams = { taskId: taskId }; screen = "focus"; loader.load(); return }
         go("focus", { taskId: taskId })
+    }
+    // A view's ids after dragging row `from` to `to` (for backend.reorderTasks / reorderLists).
+    function reorderedIds(model, from, to) {
+        var ids = []
+        for (var i = 0; i < model.count; i++) ids.push(model.get(i).id)
+        var moved = ids.splice(from, 1)[0]
+        ids.splice(to, 0, moved)
+        return ids
     }
     function openPlan(taskId) { go("plan", { taskId: taskId }) }
     function openEditor(taskId) { go("editor", { taskId: taskId }) }
@@ -151,6 +161,20 @@ ApplicationWindow {
     }
 
     // -------------------------------------------------------------- layout
+    // Optional background picture (Settings > Background), cropped to fill and centred,
+    // under a light wash of the window colour so text stays readable.
+    Image {
+        anchors.fill: parent
+        visible: source !== ""
+        source: backend.bgImage
+        fillMode: Image.PreserveAspectCrop
+        horizontalAlignment: Image.AlignHCenter
+        verticalAlignment: Image.AlignVCenter
+        asynchronous: true
+        sourceSize.width: 1600          // plenty for a side-of-screen window; keeps memory low
+        Rectangle { anchors.fill: parent; color: Theme.windowColor; opacity: 0.35 }
+    }
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 0

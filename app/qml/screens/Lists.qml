@@ -8,6 +8,8 @@ Item {
     id: screen
     readonly property int bottomInset: quick.height   // undo/info messages sit above the add box
     property bool drawerOpen: false
+    // Date for the next add: "" = no date, "tomorrow", or an ISO date.
+    property string addWhen: ""
 
     // Esc closes the side panel. (Main's Esc is off on tab screens, so no clash.)
     Shortcut { sequence: "Esc"; enabled: screen.drawerOpen; onActivated: screen.drawerOpen = false }
@@ -48,16 +50,30 @@ Item {
             }
         }
 
+        // Same cards as My Day: steps inline, check them off, drag titles to reorder.
         ListView {
             id: list
             Layout.fillWidth: true
             Layout.fillHeight: true
+            Layout.leftMargin: Theme.s3
+            Layout.rightMargin: Theme.s3
             clip: true
+            spacing: Theme.s2
+            bottomMargin: Theme.s3
             model: backend.listTasksModel
             boundsBehavior: Flickable.StopAtBounds
-            ScrollBar.vertical: ScrollBar {}
-            delegate: TaskRow { showDate: true }
-            add: Transition { NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.durMed } }
+            ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+            property Item dropLine: taskLine
+            delegate: TaskCard {
+                onReorder: (from, to) => backend.reorderTasks(appWindow.reorderedIds(backend.listTasksModel, from, to))
+            }
+            Rectangle { id: taskLine; visible: false; z: 50; width: parent.width; height: 3; radius: 2; color: Theme.accent }
+            add: Transition {
+                ParallelAnimation {
+                    NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.durMed }
+                    NumberAnimation { property: "scale"; from: 0.97; to: 1; duration: Theme.durMed; easing.type: Easing.OutCubic }
+                }
+            }
             Label {
                 anchors.centerIn: parent
                 visible: list.count === 0
@@ -66,13 +82,37 @@ Item {
             }
         }
 
+        // Adds to this list ("/" isn't needed here; "//" tags still work). No date by default;
+        // Tomorrow / the calendar work as on My Day.
         QuickAdd {
             id: quick
             Layout.fillWidth: true
-            placeholder: "Add to " + backend.currentListName + "…"
-            showChip: false
-            onSubmitted: (text, listId, newListName) =>
-                backend.addTask(text, "none", listId || backend.currentListId, newListName)
+            allowLists: false
+            readonly property string whenLabel: screen.addWhen === "" ? "" :
+                (screen.addWhen === "tomorrow" ? "Tomorrow" : backend.dateLabel(screen.addWhen))
+            placeholder: screen.addWhen === "" ? "Add to " + backend.currentListName + "…"
+                                               : "Add for " + whenLabel.toLowerCase() + "…"
+            chipCheckable: false
+            chipChecked: screen.addWhen !== ""
+            chipText: screen.addWhen === "" || screen.addWhen === "tomorrow" ? "Tomorrow" : whenLabel + "  ✕"
+            onChipClicked: {
+                if (quick.taskText() !== "") quick.submit("tomorrow")
+                else screen.addWhen = (screen.addWhen === "" ? "tomorrow" : "")
+            }
+            showCalendar: true
+            onCalendarClicked: appWindow.pickDate(function (iso) {
+                var when = (iso <= backend.todayIso) ? "today" : iso
+                if (quick.taskText() !== "") quick.submit(when)
+                else screen.addWhen = (when === "today" ? "" : when)
+                quick.focusField()
+            })
+            onSubmitted: (text, listId, newListName, tagIds, newTagNames) => {
+                var when = quick.submitWhen || (screen.addWhen === "" ? "none" : screen.addWhen)
+                backend.addTask(text, when, backend.currentListId, "", tagIds, newTagNames)
+                if (when !== "none")
+                    appWindow.toast("Added for " + (when === "today" ? "today" : when === "tomorrow" ? "tomorrow" : backend.dateLabel(when)), "")
+                else Qt.callLater(list.positionViewAtEnd)
+            }
         }
     }
 
@@ -119,18 +159,33 @@ Item {
                 model: backend.listsModel
                 boundsBehavior: Flickable.StopAtBounds
                 ScrollBar.vertical: ScrollBar {}
+                property Item dropLine: listLine
+                Rectangle { id: listLine; visible: false; z: 50; width: parent.width; height: 3; radius: 2; color: Theme.accent }
                 delegate: ItemDelegate {
                     id: row
                     required property string itemId
                     required property string name
                     required property int count
+                    required property int index
                     readonly property bool current: itemId === backend.currentListId
                     width: lists.width
                     height: 44
-                    onClicked: { backend.currentListId = itemId; screen.drawerOpen = false }
+                    z: listDrag.dragging ? 10 : 0
+                    transform: Translate { y: listDrag.offset }
+                    // Click opens the list; drag reorders the lists.
+                    ReorderArea {
+                        id: listDrag
+                        anchors.fill: parent
+                        row: row
+                        view: lists
+                        index: row.index
+                        indicator: listLine
+                        onTapped: { backend.currentListId = row.itemId; screen.drawerOpen = false }
+                        onDropped: (from, to) => backend.reorderLists(appWindow.reorderedIds(backend.listsModel, from, to))
+                    }
                     background: Rectangle {
                         color: row.current ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.14)
-                                           : (row.hovered ? Theme.hover : "transparent")
+                                           : (listDrag.containsMouse ? Theme.hover : "transparent")
                         Rectangle {  // accent marker on the selected list
                             visible: row.current
                             width: 3; height: parent.height * 0.5; radius: 2

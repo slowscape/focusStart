@@ -5,20 +5,21 @@ import "../theme"
 
 // One remaining step, inline in a card. Checking it: check animation + effect,
 // then the row fades and collapses away (ListView remove, via delayRemove).
+// The whole step text is shown (wraps, never cut short). Drag the text to reorder.
 Item {
     id: row
     required property string itemId
     required property string text
     required property int index
     property string taskId
-    property bool shown: true
     signal completed(var checkItem)
+    signal reorder(int from, int to)
 
     width: ListView.view ? ListView.view.width : implicitWidth
-    implicitHeight: shown ? Math.max(34, label.implicitHeight + 12) : 0
+    implicitHeight: Math.max(34, label.implicitHeight + 12)
     height: implicitHeight
-    visible: shown || ListView.delayRemove
     clip: true
+    transform: Translate { y: drag.offset }
 
     RowLayout {
         anchors.fill: parent
@@ -34,9 +35,18 @@ Item {
             Layout.fillWidth: true
             text: row.text
             wrapMode: Text.Wrap
-            maximumLineCount: 3
-            elide: Text.ElideRight
             font.pixelSize: Theme.fontBody
+            color: drag.dragging ? Theme.accent : Theme.textColor
+            ReorderArea {
+                id: drag
+                anchors.fill: parent
+                cursorShape: dragging ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                row: row
+                view: row.ListView.view
+                index: row.index
+                indicator: row.ListView.view ? row.ListView.view.dropLine || null : null
+                onDropped: (from, to) => row.reorder(from, to)
+            }
         }
     }
 

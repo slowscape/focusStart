@@ -12,7 +12,7 @@ from PySide6.QtGui import QDesktopServices
 
 from ..core import dates, history, phrases, printout
 from ..core.pomodoro import LIMITS as POMO_LIMITS, Pomodoro, clamp as pomo_clamp
-from ..core.models import Task
+from ..core.models import TAG_COLORS, Task
 from ..core.service import Service
 from ..core.store import Store
 from .models import HistoryModel, KeyedListModel
@@ -22,7 +22,12 @@ from .sound import SoundBank, step_sound, task_sound
 log = logging.getLogger(__name__)
 
 TASK_ROLES = ["title", "notes", "plannedDate", "dateLabel", "listId", "listName",
-              "stepTotal", "stepDone", "stepRemaining", "section", "inMyDay", "completedOpen"]
+              "stepTotal", "stepDone", "stepRemaining", "section", "inMyDay", "completedOpen",
+              "tagColors", "tagNames", "repeat"]
+TAG_ROLES = ["name", "color"]
+IMAGE_EXT = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".gif"}
+REPEAT_LABELS = {"daily": "Every day", "weekdays": "Every weekday", "weekly": "Every week",
+                 "monthly": "Every month"}
 STEP_ROLES = ["text"]
 LIST_ROLES = ["name", "count"]
 
@@ -44,6 +49,7 @@ class Backend(QObject):
     dateRolledOver = Signal()
     pomodoroChanged = Signal()
     historyChanged = Signal()
+    backgroundChanged = Signal()
 
     def __init__(self, service: Service, store: Store, sounds: SoundBank,
                  notice: str | None = None, first_run: bool = False, parent=None):
@@ -65,6 +71,9 @@ class Backend(QObject):
         self._pomo_timer = QTimer(self)
         self._pomo_timer.setInterval(500)
         self._pomo_timer.timeout.connect(self._pomo_tick)
+        self._pomo_task: str | None = None    # the task whose Start began the timer
+        self._focus_task: str = ""            # task open in Focus (for the bar's play/power)
+        self._bg_image = ""
         self._last_encouragement: str | None = None
         self._today = self.svc.today()
         self._window_active = False
@@ -73,6 +82,7 @@ class Backend(QObject):
         self._upcoming = KeyedListModel(TASK_ROLES, self)
         self._list_tasks = KeyedListModel(TASK_ROLES, self)
         self._lists = KeyedListModel(LIST_ROLES, self)
+        self._tags = KeyedListModel(TAG_ROLES, self)
         self._current_list = self.svc.default_list_id()
 
         self._save_timer = QTimer(self)
@@ -85,6 +95,7 @@ class Backend(QObject):
         self._tick.timeout.connect(self.tick)
         self._tick.start()
 
+        self._bg_image = self._compute_bg()
         if first_run:
             self._notice = "Welcome. Add your first task below, then break it into small steps."
             self._schedule_save()
@@ -114,6 +125,7 @@ class Backend(QObject):
         done = sum(1 for s in t.steps if s.done)
         rem = len(t.remaining_steps)
         today = self.svc.today()
+        tags = [g for g in (self.svc.tag_by_id(i) for i in t.tag_ids) if g is not None]
         return {
             "id": t.id, "title": t.title, "notes": t.notes,
             "plannedDate": t.planned_date or "",
@@ -123,6 +135,8 @@ class Backend(QObject):
             "section": section,
             "inMyDay": bool(t.planned_date and date.fromisoformat(t.planned_date) <= today),
             "completedOpen": t.completed_open,
+            "tagColors": [g.color for g in tags], "tagNames": [g.name for g in tags],
+            "repeat": t.repeat,
         }
 
     @staticmethod
@@ -149,14 +163,19 @@ class Backend(QObject):
     def _refresh(self):
         today = self.svc.today()
         self._my_day.sync([self._task_item(t) for t in self.svc.my_day()])
+        # Upcoming, then every open task with no date at the bottom (easy to send to My Day).
+        undated = sorted((t for t in self.svc.data.tasks if not t.done and not t.planned_date),
+                         key=lambda t: (t.order, t.created_at))
         self._upcoming.sync([self._task_item(t, self._upcoming_section(t.planned_date, today))
-                             for t in self.svc.upcoming()])
+                             for t in self.svc.upcoming()]
+                            + [self._task_item(t, "No date") for t in undated])
         if self.svc.list_by_id(self._current_list) is None:
             self._current_list = self.svc.default_list_id()
             self.currentListChanged.emit()
         self._list_tasks.sync([self._task_item(t) for t in self.svc.list_tasks(self._current_list)])
         self._lists.sync([{"id": l.id, "name": l.name, "count": self.svc.incomplete_count(l.id)}
                           for l in self.svc.lists()])
+        self._tags.sync([{"id": g.id, "name": g.name, "color": g.color} for g in self.svc.tags()])
         for task_id, model in self._step_models.items():
             t = self.svc.task(task_id)
             model.sync([{"id": s.id, "text": s.text} for s in (t.remaining_steps if t else [])])
@@ -187,6 +206,7 @@ class Backend(QObject):
     upcomingModel = Property(QObject, lambda self: self._upcoming, constant=True)
     listTasksModel = Property(QObject, lambda self: self._list_tasks, constant=True)
     listsModel = Property(QObject, lambda self: self._lists, constant=True)
+    tagsModel = Property(QObject, lambda self: self._tags, constant=True)
 
     def _get_today_label(self):
         d = self.svc.today()
@@ -305,18 +325,24 @@ class Backend(QObject):
             return None
         return date.fromisoformat(when)
 
-    @Slot(str, str, str, str, result=str)
-    def addTask(self, title: str, when: str, list_id: str, new_list_name: str) -> str:
+    @Slot(str, str, str, str, "QVariantList", "QVariantList", result=str)
+    def addTask(self, title: str, when: str, list_id: str, new_list_name: str,
+                tag_ids=None, new_tag_names=None) -> str:
         """new_list_name (from the quick-add /command) wins: existing list in any case,
-        or a new list named exactly as typed."""
+        or a new list named exactly as typed. Tags: existing ids plus //names to create."""
         if not title.strip():
             return ""
         if new_list_name.strip():
             list_id = self.svc.ensure_list(new_list_name).id
+        tags = [str(i) for i in (tag_ids or [])]
+        tags += [self.svc.ensure_tag(str(n)).id for n in (new_tag_names or []) if str(n).strip()]
         try:
-            t = self.svc.add_task(title, self._parse_when(when), list_id or None)
+            t = self.svc.add_task(title, self._parse_when(when), list_id or None, tags)
         except ValueError:
             return ""
+        lists = [l.id for l in self.svc.lists()]
+        log.info("task added: list #%s, date %s, %d tag(s)",
+                 lists.index(t.list_id) if t.list_id in lists else "?", t.planned_date or "none", len(tags))
         self._mutated()
         return t.id
 
@@ -338,7 +364,13 @@ class Backend(QObject):
         rem = t.remaining_steps
         item.update({
             "exists": True, "done": t.done,
-            "steps": [{"id": s.id, "text": s.text, "done": s.done} for s in t.steps_in_order],
+            "steps": [{"id": s.id, "text": s.text, "done": s.done, "notes": s.notes}
+                      for s in t.steps_in_order],
+            "doneSteps": [{"id": s.id, "text": s.text, "notes": s.notes} for s in t.done_steps],
+            "tagIds": t.tag_ids,
+            "tags": [{"id": g.id, "name": g.name, "color": g.color}
+                     for g in (self.svc.tag_by_id(i) for i in t.tag_ids) if g is not None],
+            "repeatLabel": REPEAT_LABELS.get(t.repeat, ""),
             "currentStepId": rem[0].id if rem else "",
             "currentStep": rem[0].text if rem else "",
             "completedCount": len(t.done_steps),
@@ -429,6 +461,70 @@ class Backend(QObject):
         return len(self.svc.my_day())
 
     # ================================================================ steps
+    # ================================================================ order (drag and drop)
+    @Slot("QVariantList")
+    def reorderTasks(self, ids):
+        """The tasks shown in a view, in their new order (My Day, a list, an Upcoming day)."""
+        self.svc.reorder_tasks([str(i) for i in ids])
+        self._mutated()
+
+    @Slot("QVariantList")
+    def reorderLists(self, ids):
+        self.svc.reorder_lists([str(i) for i in ids])
+        self._mutated()
+
+    # ================================================================ repeat, tags
+    @Slot(str, str)
+    def setRepeat(self, task_id: str, rule: str):
+        if self.svc.task(task_id):
+            self.svc.set_repeat(task_id, rule)
+            self._mutated()
+
+    @Slot(str, "QVariantList")
+    def setTaskTags(self, task_id: str, ids):
+        if self.svc.task(task_id):
+            self.svc.set_task_tags(task_id, [str(i) for i in ids])
+            self._mutated()
+
+    tagPalette = Property("QVariantList", lambda self: list(TAG_COLORS), constant=True)
+
+    @Slot(str, result="QVariantList")
+    def tagMatches(self, query: str):
+        return [{"id": g.id, "name": g.name, "color": g.color} for g in self.svc.match_tags(query)]
+
+    @Slot(str, result="QVariantMap")
+    def findTag(self, name: str):
+        g = self.svc.find_tag(name)
+        return {"id": g.id, "name": g.name, "color": g.color} if g else {}
+
+    @Slot(str, result=str)
+    def addTag(self, name: str) -> str:
+        try:
+            g = self.svc.add_tag(name)
+        except ValueError:
+            return ""
+        self._mutated()
+        return g.id
+
+    @Slot(str, str, str)
+    def updateTag(self, tag_id: str, name: str, color: str):
+        self.svc.update_tag(tag_id, name or None, color or None)
+        self._mutated()
+
+    @Slot(str)
+    def deleteTag(self, tag_id: str):
+        self.svc.delete_tag(tag_id)
+        self._mutated()
+
+    # ================================================================ steps
+    @Slot(str, str, str)
+    def setStepNotes(self, task_id: str, step_id: str, notes: str):
+        t = self.svc.task(task_id)
+        s = t.step(step_id) if t else None
+        if s is not None and s.notes != notes:
+            self.svc.set_step_notes(task_id, step_id, notes)
+            self._mutated()
+
     @Slot(str, result=QObject)
     def stepModel(self, task_id: str):
         m = self._step_models.get(task_id)
@@ -507,6 +603,12 @@ class Backend(QObject):
         self._last_encouragement = msg
         if c.all_clear_again:
             msg = "All clear again."
+        if c.repeat_date:
+            msg += " Next one: " + self._date_label(c.repeat_date, self.svc.today()) + "."
+        if c.task_completed and c.task_id == self._pomo_task and self._pomo.running:
+            self._pomo.stop()          # the task that started the timer is done: timer off
+            self._pomo_task = None
+            self._pomo_emit()
         return {"ok": True, "token": c.token, "effect": effect, "variant": variant,
                 "taskDone": c.task_completed, "dayComplete": c.day_complete,
                 "allClearAgain": c.all_clear_again, "firstTaskToday": c.first_task_today,
@@ -598,6 +700,11 @@ class Backend(QObject):
     historySteps = Property(int, lambda self: self._history_totals[0], notify=historyChanged)
     historyTasks = Property(int, lambda self: self._history_totals[1], notify=historyChanged)
 
+    def _get_history_stats(self):
+        return [{"label": x.label, "tasks": x.tasks, "steps": x.steps}
+                for x in history.totals(self.svc.data, self.svc.today(), self._s().week_starts)]
+    historyStats = Property("QVariantList", _get_history_stats, notify=historyChanged)
+
     @Slot()
     def reloadHistory(self):
         """Rebuild the history index (cheap) and show its first page."""
@@ -668,17 +775,23 @@ class Backend(QObject):
         now = self._pomo_now()
         if not self._pomo.running:
             self._pomo.start(now)
+            self._pomo_task = task_id
         elif self._pomo.waiting:
             self._pomo.resume(now)
         else:
             return
         self._pomo_emit()
 
+    @Slot(str)
+    def setFocusTask(self, task_id: str):
+        self._focus_task = task_id
+
     @Slot()
     def pomoTogglePause(self):
         now = self._pomo_now()
         if not self._pomo.running:
             self._pomo.start(now)
+            self._pomo_task = self._focus_task or None
         elif self._pomo.paused:
             self._pomo.resume(now)
         else:
@@ -691,6 +804,7 @@ class Backend(QObject):
         self.pomoSetEnabled(on)
         if on:
             self._pomo.start(self._pomo_now())
+            self._pomo_task = self._focus_task or None
             self._pomo_emit()
 
     @Slot(bool)
@@ -714,6 +828,69 @@ class Backend(QObject):
         self._schedule_save()
         self._pomo_emit()
 
+    # ================================================================ background images
+    def _bg(self):
+        return self.svc.data.settings.background
+
+    def _bg_files(self) -> list:
+        folder = self._bg()["folder"]
+        if not folder:
+            return []
+        try:
+            p = Path(folder)
+            return sorted((f for f in p.iterdir() if f.suffix.lower() in IMAGE_EXT and f.is_file()),
+                          key=lambda f: f.name.lower())
+        except OSError:
+            return []
+
+    def _compute_bg(self) -> str:
+        bg = self._bg()
+        files = self._bg_files() if bg["enabled"] else []
+        if not files:
+            return ""
+        minutes = bg["interval"]
+        slot = self.svc.today().toordinal() if minutes >= 1440 else int(time.time() // 60 // minutes)
+        return QUrl.fromLocalFile(str(files[slot % len(files)])).toString()
+
+    def _bg_update(self):
+        img = self._compute_bg()
+        if img != self._bg_image:
+            self._bg_image = img
+        self.backgroundChanged.emit()
+
+    bgImage = Property(str, lambda self: self._bg_image, notify=backgroundChanged)
+    bgEnabled = Property(bool, lambda self: self._bg()["enabled"], notify=backgroundChanged)
+    bgFolder = Property(str, lambda self: self._bg()["folder"], notify=backgroundChanged)
+    bgInterval = Property(int, lambda self: self._bg()["interval"], notify=backgroundChanged)
+    bgImageCount = Property(int, lambda self: len(self._bg_files()), notify=backgroundChanged)
+
+    @Slot(bool)
+    def setBgEnabled(self, on: bool):
+        self._bg()["enabled"] = bool(on)
+        self._schedule_save()
+        self._bg_update()
+
+    @Slot(str)
+    def setBgFolder(self, folder_url: str):
+        path = QUrl(folder_url).toLocalFile() if "://" in folder_url else folder_url
+        self._bg()["folder"] = path
+        self._bg()["enabled"] = bool(path)
+        self._schedule_save()
+        self._bg_update()
+
+    @Slot(int)
+    def setBgInterval(self, minutes: int):
+        from ..core.models import BACKGROUND_INTERVALS
+        if minutes in BACKGROUND_INTERVALS:
+            self._bg()["interval"] = minutes
+            self._schedule_save()
+            self._bg_update()
+
+    @Slot()
+    def openBgFolder(self):
+        if self._bg()["folder"]:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(self._bg()["folder"]))
+
     # ================================================================ day rollover
     @Slot(bool)
     def windowActiveChanged(self, active: bool):
@@ -723,6 +900,11 @@ class Backend(QObject):
 
     @Slot()
     def tick(self):
+        if self._bg()["enabled"]:
+            img = self._compute_bg()
+            if img != self._bg_image:
+                self._bg_image = img
+                self.backgroundChanged.emit()
         today = self.svc.today()
         if today != self._today:
             self._today = today

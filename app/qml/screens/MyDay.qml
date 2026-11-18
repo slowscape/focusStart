@@ -44,6 +44,7 @@ Item {
                 Chip {
                     compact: true
                     tone: true
+                    onClicked: appWindow.go("history")
                     visible: backend.tasksDoneToday > 0
                     text: backend.tasksDoneToday + (backend.tasksDoneToday === 1 ? " Task" : " Tasks") + " Done"
                     fill: Theme.successSoft
@@ -51,6 +52,7 @@ Item {
                 Chip {
                     compact: true
                     tone: true
+                    onClicked: appWindow.go("history")
                     visible: backend.stepsDoneToday > 0
                     text: backend.stepsDoneToday + (backend.stepsDoneToday === 1 ? " Step" : " Steps") + " Done"
                     fill: Theme.successSoft
@@ -75,7 +77,12 @@ Item {
             bottomMargin: Theme.s3
             boundsBehavior: Flickable.StopAtBounds
             ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
-            delegate: TaskCard {}
+            // Drag a card's title to reorder; the accent line shows where it will land.
+            property Item dropLine: dropLine
+            delegate: TaskCard {
+                onReorder: (from, to) => backend.reorderTasks(appWindow.reorderedIds(backend.myDayModel, from, to))
+            }
+            Rectangle { id: dropLine; visible: false; z: 50; width: parent.width; height: 3; radius: 2; color: Theme.accent }
             add: Transition {
                 ParallelAnimation {
                     NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.durMed }
@@ -97,7 +104,7 @@ Item {
             Layout.fillWidth: true
             readonly property string whenLabel: screen.addWhen === "" ? "" :
                 (screen.addWhen === "tomorrow" ? "Tomorrow" : backend.dateLabel(screen.addWhen))
-            placeholder: screen.addWhen === "" ? "Add a task\u2026  (/ picks a list)" : "Add for " + (screen.addWhen === "tomorrow" ? "tomorrow" : whenLabel) + "\u2026"
+            placeholder: screen.addWhen === "" ? "Add a task\u2026  (/ list, // tag)" : "Add for " + (screen.addWhen === "tomorrow" ? "tomorrow" : whenLabel) + "\u2026"
             chipCheckable: false
             chipChecked: screen.addWhen !== ""
             chipText: screen.addWhen === "" || screen.addWhen === "tomorrow" ? "Tomorrow" : whenLabel + "  \u2715"
@@ -114,9 +121,9 @@ Item {
                 else screen.addWhen = when
                 quick.focusField()
             })
-            onSubmitted: (text, listId, newListName) => {
+            onSubmitted: (text, listId, newListName, tagIds, newTagNames) => {
                 var when = quick.submitWhen || (screen.addWhen === "" ? "today" : screen.addWhen)
-                backend.addTask(text, when, listId, newListName)
+                backend.addTask(text, when, listId, newListName, tagIds, newTagNames)
                 if (when !== "today")
                     appWindow.toast("Added to " + (when === "tomorrow" ? "tomorrow" : backend.dateLabel(when)), "")
                 else Qt.callLater(list.positionViewAtEnd)

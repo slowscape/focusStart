@@ -45,14 +45,16 @@ Item {
                 spacing: Theme.s3
 
                 // ---------------------------------------------- open task
-                TextField {
+                // Wraps instead of scrolling sideways, so a long title is always fully visible.
+                StepInput {
                     id: title
                     visible: !screen.finished
                     Layout.fillWidth: true
                     text: screen.info.title || ""
                     font.pixelSize: Theme.fontBody + 2
                     placeholderText: "Task title"
-                    function commit() { if (text.trim() && text !== screen.info.title) backend.setTitle(screen.taskId, text) }
+                    function commit() { if (text.trim() && text.trim() !== screen.info.title) backend.setTitle(screen.taskId, text.trim()) }
+                    onAccepted: { commit(); screen.forceActiveFocus() }
                     onEditingFinished: if (!screen.finished) commit()
                 }
 
@@ -112,6 +114,67 @@ Item {
                         text: "Pomodoro timer for this task"
                         checked: screen.info.pomodoro === true
                         onToggled: backend.setTaskPomodoro(screen.taskId, checked)
+                    }
+
+                    // Repeat: when it's finished, a fresh copy (steps unchecked) is planned
+                    // for the next date. The finished one stays in History.
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Theme.s2
+                        Switch {
+                            id: repeatSwitch
+                            text: "Repeat"
+                            checked: (screen.info.repeat || "") !== ""
+                            onToggled: backend.setRepeat(screen.taskId, checked ? (repeatBox.currentValue || "daily") : "")
+                        }
+                        ComboBox {
+                            id: repeatBox
+                            visible: repeatSwitch.checked
+                            Layout.fillWidth: true
+                            textRole: "label"
+                            valueRole: "value"
+                            model: [
+                                { value: "daily", label: "Every day" },
+                                { value: "weekdays", label: "Every weekday" },
+                                { value: "weekly", label: "Every week" },
+                                { value: "monthly", label: "Every month" }
+                            ]
+                            currentIndex: Math.max(0, ["daily", "weekdays", "weekly", "monthly"].indexOf(screen.info.repeat || "daily"))
+                            onActivated: backend.setRepeat(screen.taskId, currentValue)
+                        }
+                    }
+
+                    // Tags: click to add or remove. Manage names and colours in Settings.
+                    Label { text: "Tags"; color: Theme.subtext; font.pixelSize: Theme.fontSmall }
+                    Flow {
+                        Layout.fillWidth: true
+                        spacing: Theme.s2
+                        Repeater {
+                            model: backend.tagsModel
+                            Chip {
+                                required property string itemId
+                                required property string name
+                                required property string color
+                                readonly property bool on: (screen.info.tagIds || []).indexOf(itemId) >= 0
+                                compact: true
+                                checkable: false
+                                fill: on ? Qt.rgba(Qt.color(color).r, Qt.color(color).g, Qt.color(color).b, 0.45) : Theme.track
+                                text: (on ? "✓ " : "") + "#" + name
+                                onClicked: {
+                                    var ids = (screen.info.tagIds || []).slice()
+                                    if (on) ids.splice(ids.indexOf(itemId), 1); else ids.push(itemId)
+                                    backend.setTaskTags(screen.taskId, ids)
+                                }
+                            }
+                        }
+                        Label {
+                            visible: backend.tagsModel.count === 0
+                            text: "No tags yet. Add some in Settings, or type //name when adding a task."
+                            color: Theme.subtext
+                            font.pixelSize: Theme.fontSmall
+                            wrapMode: Text.Wrap
+                            width: parent.width
+                        }
                     }
                 }
 
@@ -177,13 +240,27 @@ Item {
                     Layout.topMargin: Theme.s1
                 }
                 Repeater {
-                    model: (screen.showCompleted || screen.finished) ? screen.completed : []
+                    model: (screen.showCompleted || screen.finished) ? (screen.info.doneSteps || []) : []
                     delegate: RowLayout {
                         required property var modelData
                         Layout.fillWidth: true
                         spacing: Theme.s2
-                        Icon { visible: screen.finished; name: "check"; size: 11; color: Theme.success }
-                        Label { text: modelData.text; color: Theme.subtext; Layout.fillWidth: true; wrapMode: Text.Wrap }
+                        Icon { visible: screen.finished; name: "check"; size: 11; color: Theme.success; Layout.alignment: Qt.AlignTop; Layout.topMargin: 4 }
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 0
+                            Label { text: modelData.text; color: Theme.subtext; Layout.fillWidth: true; wrapMode: Text.Wrap }
+                            Label {   // the step's own notes, if any
+                                visible: (modelData.notes || "") !== ""
+                                Layout.fillWidth: true
+                                Layout.leftMargin: Theme.s2
+                                text: modelData.notes || ""
+                                wrapMode: Text.Wrap
+                                font.pixelSize: Theme.fontSmall
+                                color: Theme.textColor
+                                opacity: 0.85
+                            }
+                        }
                         Button { visible: !screen.finished; text: "Restore"; flat: true; onClicked: backend.restoreStep(screen.taskId, modelData.id) }
                     }
                 }

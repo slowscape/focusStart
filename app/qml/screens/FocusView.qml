@@ -14,8 +14,10 @@ Item {
     property bool justFinished: false
     property string nextId: ""
     property string selectedStepId: ""
+    // Messages ("Nice.", undo) sit as high as on My Day, clear of the Step Complete button.
+    readonly property int bottomInset: 56
     readonly property bool finished: justFinished && info.exists && info.done
-    readonly property bool editing: notes.editing || addField.activeFocus
+    readonly property bool editing: notes.editing || stepNotes.editing || addField.activeFocus
     readonly property var steps: info.steps || []
     readonly property var remaining: steps.filter(function (s) { return !s.done })
     // The selected step (done or not), else the first to-do step.
@@ -38,7 +40,12 @@ Item {
         return null
     }
 
-    onTaskIdChanged: { justFinished = false; addRow.open = false; selectedStepId = ""; appWindow.lastFocusTaskId = taskId }
+    onTaskIdChanged: {
+        justFinished = false; addRow.open = false; selectedStepId = ""
+        appWindow.lastFocusTaskId = taskId
+        backend.setFocusTask(taskId)       // the timer's play/power belong to this task
+    }
+    Component.onCompleted: backend.setFocusTask(taskId)
 
     function select(stepId) {
         if (current && stepId === current.id) return
@@ -91,8 +98,6 @@ Item {
                     font.pixelSize: Theme.fontTitle - 2
                     font.weight: Font.DemiBold
                     wrapMode: Text.Wrap
-                    maximumLineCount: 2
-                    elide: Text.ElideRight
                 }
                 Label { text: screen.info.listName || ""; color: Theme.subtext; font.pixelSize: Theme.fontSmall }
             }
@@ -167,7 +172,7 @@ Item {
                 font.pixelSize: Theme.fontHero
                 font.weight: Font.DemiBold
                 fontSizeMode: Text.Fit
-                minimumPixelSize: Theme.fontBody
+                minimumPixelSize: Theme.fontSmall - 1   // long steps shrink rather than get cut off
                 wrapMode: Text.Wrap
                 elide: Text.ElideRight
                 horizontalAlignment: Text.AlignHCenter
@@ -195,11 +200,31 @@ Item {
             IconButton { icon_: "close"; tip: "Close"; onClicked: { addField.clear(); addRow.open = false } }
         }
 
+        // Notes: the current step's own notes fill the middle; the task's notes sit below,
+        // smaller. A task without steps has only its task notes.
+        readonly property bool hasStep: screen.current !== null && !screen.finished
+        Label {
+            visible: parent.hasStep
+            text: screen.viewingDone ? "Step Notes (done step)" : "Step Notes"
+            color: Theme.subtext; font.pixelSize: Theme.fontSmall
+        }
+        NotesArea {
+            id: stepNotes
+            visible: parent.hasStep
+            Layout.fillWidth: true
+            Layout.fillHeight: true      // absorbs spare space, so the buttons stay at the bottom
+            Layout.minimumHeight: 48
+            taskId: screen.taskId
+            stepId: screen.current ? screen.current.id : ""
+            notes: screen.current ? (screen.current.notes || "") : ""
+            onEscaped: screen.forceActiveFocus()
+        }
         Label { text: "Task Notes"; color: Theme.subtext; font.pixelSize: Theme.fontSmall }
         NotesArea {
             id: notes
             Layout.fillWidth: true
-            Layout.fillHeight: true      // absorbs all spare space, so the buttons stay at the bottom
+            Layout.fillHeight: !parent.hasStep
+            Layout.preferredHeight: parent.hasStep ? 64 : -1
             Layout.minimumHeight: 48
             taskId: screen.taskId
             notes: screen.info.notes || ""
@@ -286,7 +311,7 @@ Item {
                 highlighted: true
                 text: "Next up: " + (screen.nextId ? (backend.revision, backend.taskInfo(screen.nextId).title) : "")
                 contentItem: Label {
-                    text: parent.text; color: "white"; elide: Text.ElideRight
+                    text: parent.text; color: "white"; wrapMode: Text.Wrap
                     horizontalAlignment: Text.AlignHCenter; verticalAlignment: Text.AlignVCenter
                 }
                 onClicked: screen.taskId = screen.nextId

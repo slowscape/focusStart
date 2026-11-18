@@ -12,6 +12,20 @@ Item {
     readonly property string addLabel: addDate === "" ? "Tomorrow" : backend.dateLabel(addDate)
     Component.onCompleted: if (focusQuickAdd) Qt.callLater(quick.focusField)
 
+    function moveTask(from, to) {
+        var m = backend.upcomingModel
+        var moved = m.get(from), target = m.get(to)
+        if (!moved.id || !target.id) return
+        var ids = appWindow.reorderedIds(m, from, to)
+        // Order only among the tasks of the section it lands in.
+        var inSection = {}
+        for (var i = 0; i < m.count; i++) if (m.get(i).section === target.section) inSection[m.get(i).id] = true
+        inSection[moved.id] = true
+        if (target.plannedDate !== moved.plannedDate)
+            backend.setDate(moved.id, target.plannedDate === "" ? "none" : target.plannedDate)
+        backend.reorderTasks(ids.filter(function (id) { return inSection[id] }))
+    }
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
@@ -41,7 +55,14 @@ Item {
                 topPadding: Theme.s3
                 bottomPadding: Theme.s1
             }
-            delegate: TaskRow { showDate: true }
+            // Drag a task's title to reorder it, or drop it among another day's tasks to move
+            // it to that day ("No date" removes its date).
+            property Item dropLine: upLine
+            delegate: TaskRow {
+                showDate: true
+                onReorder: (from, to) => screen.moveTask(from, to)
+            }
+            Rectangle { id: upLine; visible: false; z: 50; width: parent.width; height: 3; radius: 2; color: Theme.accent }
             add: Transition { NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.durMed } }
 
             Label {
@@ -61,9 +82,9 @@ Item {
             chipCheckable: false
             chipText: screen.addLabel + "  ▾"
             onChipClicked: dayMenu.popup()
-            onSubmitted: (text, listId, newListName) => {
+            onSubmitted: (text, listId, newListName, tagIds, newTagNames) => {
                 var when = quick.submitWhen || (screen.addDate === "" ? "tomorrow" : screen.addDate)
-                backend.addTask(text, when, listId, newListName)
+                backend.addTask(text, when, listId, newListName, tagIds, newTagNames)
                 if (quick.submitWhen) appWindow.toast("Added to " + (when === "tomorrow" ? "tomorrow" : backend.dateLabel(when)), "")
             }
             // With a task typed, picking a day adds it right away for that day (one-off);

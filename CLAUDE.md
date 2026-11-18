@@ -50,6 +50,13 @@ the owner changed several things after trying the app (listed under "Decisions")
   `Flow` between the title and Print, so they stack instead of widening the row.
 - Tab buttons are `focusPolicy: Qt.NoFocus`: closing a Menu by clicking a tab left Fluent's white
   focus ring on it.
+- Drag and drop uses `ReorderArea.qml` (a MouseArea with preventStealing over a title/step text):
+  click = click, drag past 6 px = reorder. Delegates bind `transform: Translate { y: area.offset }`;
+  the ListView exposes `property Item dropLine` for the accent drop line. Don't use DragHandler on
+  cards: the ListView (a Flickable) steals the drag. `reorder_tasks(ids)` re-deals the order slots
+  the given tasks already hold, so other views keep their order.
+- `NotesArea` pins its TextArea to `availableWidth` (contentWidth too): otherwise the ScrollView
+  can size from the first layout and clip notes on the right until the window is resized.
 - Esc: Main's Esc shortcut is enabled only off tab screens, so screen-level Esc shortcuts never clash
   (two enabled shortcuts with the same key both stop working).
 
@@ -82,7 +89,28 @@ the owner changed several things after trying the app (listed under "Decisions")
 - My Day shows "N Steps Done" and "N Tasks Done" badges. History tab lists every completion.
 - History rows open their task. A finished task shows read-only (notes, completed steps) with
   "Delete from history" (confirmed; `delete_task(..., include_completed=True)`). No bulk clear.
-- Notes are labelled "Task Notes", no placeholder text.
+- Notes: each step has its own notes (`Step.notes`, written only when non-empty); Focus shows the
+  current step's "Step Notes" (fills the middle) and the smaller "Task Notes" below. Step-less tasks
+  have task notes only. The finished-task page lists completed steps with their notes.
+- No truncation of task or step text anywhere (cards grow; the editor title wraps). Only the Focus
+  step text shrinks to fit its fixed area.
+- Task title click opens Focus without starting the timer; the play arrow starts it. My Day's Done
+  pills open History.
+- Lists tab uses the same TaskCard as My Day. Its quick-add has Tomorrow/calendar (default: no date)
+  and no "/" list command (always the shown list). Upcoming ends with a "No date" section.
+- Drag and drop: My Day and list cards, steps inside cards, lists in the Lists panel, Upcoming rows
+  (dropping among another day's tasks changes the date; "No date" clears it). Not tabs, not History.
+- Tags: `AppData.tags` (id, name, colour from `TAG_COLORS`, no red); tasks hold `extra.tags`.
+  Managed in Settings (rename, colour, delete). "//name" in quick-add picks/creates (sticky chips).
+  Coloured dots sit just before the task title.
+- Repeat (Edit task): Daily / Weekdays / Weekly / Monthly in `extra.repeat`. Completing the task plans
+  a fresh copy (steps unchecked, notes and tags kept) via `dates.next_occurrence`; undo removes it.
+- Pomodoro is owned by the task whose Start began it; when that task completes the timer stops and
+  the top strip goes away.
+- History shows totals: this week, month, year, all time (`history.totals`).
+- Background: Settings > Background picks a folder; images rotate every 5/15/60 min or daily
+  (deterministic by time, no state), cropped to fill, under a light window-colour wash; cards go
+  more solid (`Theme.backdrop`). Off = plain.
 - **No morning recap** (removed with its logic; old `last_recap_date`/`recap_history` keys sit in `extra`).
 - App icon (`tools/generate_images.py`): the My Day progress ring, 3 segments, 2 green, on a dark disc.
 - Focus primary button: "Step Complete" ("Task Complete" on a step-less task).
@@ -91,6 +119,7 @@ the owner changed several things after trying the app (listed under "Decisions")
 - Pomodoro limits live in `core/pomodoro.LIMITS` (Focus 180, Short 60, Long 120); UI uses the same.
 - Positive-only guardrails from SPEC.md section 9 still apply (no streaks, overdue, red, guilt copy).
 
-## Open question for the owner
-- "Click a done step to refer to its notes": steps have no notes field today (only the task's
-  "Task Notes"). Ask whether they want per-step notes before building it.
+## Open issue
+- Owner once saw a task added in Lists also appear in the default list (a real duplicate after
+  editing). Not reproduced; data had no duplicates. `addTask` now logs list position/date/tag count
+  (no titles) to app.log so a repeat can be traced.

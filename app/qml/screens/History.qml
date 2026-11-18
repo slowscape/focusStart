@@ -20,11 +20,42 @@ Item {
             Layout.topMargin: Theme.s2
             Layout.bottomMargin: Theme.s2
             Label { text: "History"; font.pixelSize: Theme.fontHero; font.weight: Font.DemiBold; Layout.fillWidth: true }
-            Label {
-                visible: backend.historySteps + backend.historyTasks > 0
-                text: Theme.plural(backend.historySteps, "step") + " · " + Theme.plural(backend.historyTasks, "task")
-                color: Theme.subtext
-                font.pixelSize: Theme.fontSmall
+        }
+        // Totals: this week, month, year, all time (tasks and steps finished).
+        GridLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: Theme.s3
+            Layout.rightMargin: Theme.s3
+            Layout.bottomMargin: Theme.s2
+            visible: backend.historySteps + backend.historyTasks > 0
+            columns: 2
+            rowSpacing: Theme.s2
+            columnSpacing: Theme.s2
+            Repeater {
+                model: backend.historyStats
+                Rectangle {
+                    required property var modelData
+                    Layout.fillWidth: true
+                    Layout.preferredWidth: 1          // equal columns
+                    implicitHeight: statCol.implicitHeight + 2 * Theme.s2
+                    radius: Theme.radius
+                    color: Theme.card
+                    border.color: Theme.cardBorder
+                    ColumnLayout {
+                        id: statCol
+                        anchors.fill: parent
+                        anchors.margins: Theme.s2
+                        anchors.leftMargin: Theme.s3
+                        spacing: 0
+                        Label { text: modelData.label; color: Theme.subtext; font.pixelSize: Theme.fontSmall }
+                        Label {
+                            Layout.fillWidth: true
+                            wrapMode: Text.Wrap
+                            text: Theme.plural(modelData.tasks, "task") + " · " + Theme.plural(modelData.steps, "step")
+                            font.weight: Font.DemiBold
+                        }
+                    }
+                }
             }
         }
         ListView {
@@ -82,13 +113,13 @@ Item {
                         Label {
                             Layout.fillWidth: true
                             text: row.text
-                            elide: Text.ElideRight
+                            wrapMode: Text.Wrap
                             font.weight: row.kind === "task" ? Font.DemiBold : Font.Normal
                         }
                         Label {
                             Layout.fillWidth: true
                             text: row.sub
-                            elide: Text.ElideRight
+                            wrapMode: Text.Wrap
                             color: Theme.subtext
                             font.pixelSize: Theme.fontSmall
                         }

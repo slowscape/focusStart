@@ -68,3 +68,32 @@ def month_window(today: date) -> tuple[date, date]:
 
 def in_window(d: date | None, window: tuple[date, date]) -> bool:
     return d is not None and window[0] <= d <= window[1]
+
+
+REPEATS = ("daily", "weekdays", "weekly", "monthly")
+
+
+def _add_month(d: date, day: int) -> date:
+    y, m = (d.year + 1, 1) if d.month == 12 else (d.year, d.month + 1)
+    last = (date(y + (m == 12), m % 12 + 1, 1) - timedelta(days=1)).day
+    return date(y, m, min(day, last))
+
+
+def next_occurrence(rule: str, anchor: date | None, today: date) -> date:
+    """First date after today in the series that `anchor` (the task's planned date,
+    or today if it had none) belongs to. Always at least one step after the anchor."""
+    d = anchor or today
+    day = d.day
+    while True:
+        if rule == "weekdays":
+            d += timedelta(days=1)
+            while d.weekday() >= 5:
+                d += timedelta(days=1)
+        elif rule == "weekly":
+            d += timedelta(days=7)
+        elif rule == "monthly":
+            d = _add_month(d, day)
+        else:  # daily
+            d += timedelta(days=1)
+        if d > today:
+            return d

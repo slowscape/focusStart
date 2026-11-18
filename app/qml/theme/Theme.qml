@@ -9,7 +9,9 @@ QtObject {
     readonly property bool dark: windowColor.hslLightness < 0.5
 
     readonly property color subtext: dark ? Qt.rgba(1, 1, 1, 0.62) : Qt.rgba(0, 0, 0, 0.58)
-    readonly property color card: dark ? Qt.rgba(1, 1, 1, 0.055) : Qt.rgba(1, 1, 1, 0.75)
+    property bool backdrop: false     // a background picture is showing: cards go solid
+    readonly property color card: backdrop ? (dark ? Qt.rgba(0.16, 0.16, 0.16, 0.92) : Qt.rgba(1, 1, 1, 0.92))
+                                           : (dark ? Qt.rgba(1, 1, 1, 0.055) : Qt.rgba(1, 1, 1, 0.75))
     readonly property color cardBorder: dark ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(0, 0, 0, 0.07)
     readonly property color hover: dark ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(0, 0, 0, 0.04)
     readonly property color track: dark ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(0, 0, 0, 0.08)

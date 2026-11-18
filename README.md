@@ -26,6 +26,11 @@ Editing `requirements.txt` also triggers a reinstall on the next launch.
   press play. Click the time to change Focus/Short/Long minutes (applies live). Turn it on/off in
   Settings or with its power button (off greys it out; turning it back on starts fresh), or for
   one task in Edit task.
+- **Tags:** type `//name` when adding a task (several allowed). Manage names and colours in Settings.
+- **Reorder:** drag a task's title, a step's text, or a list name. In Upcoming, drop a task among
+  another day's tasks to move it to that day.
+- **Repeat:** Edit task > Repeat. When you finish it, the next copy is planned automatically.
+- **Background:** Settings > Background, pick a folder of pictures.
 - **Print:** the printer icon on My Day, or a list's "..." menu, saves a checklist PDF and opens it.
 - **Focus:** click any grey segment in the step bar to work on that step next.
 
