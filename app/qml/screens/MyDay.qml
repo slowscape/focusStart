@@ -6,7 +6,8 @@ import "../theme"
 
 Item {
     id: screen
-    readonly property int bottomInset: quick.height   // undo/info messages sit above the add box
+    readonly property int bottomInset: quick.height
+    property real enterOffset: 0      // page-enter slide for header and list (not the add bar)   // undo/info messages sit above the add box
     property bool focusQuickAdd: false
     // Date for the next add: "" = today, "tomorrow", or an ISO date from the calendar.
     property string addWhen: ""
@@ -22,6 +23,7 @@ Item {
         // of widening the row. A row wider than the window pushed the whole page past the
         // right edge and cut off the cards.
         RowLayout {
+            transform: Translate { y: screen.enterOffset }
             Layout.fillWidth: true
             Layout.minimumWidth: 0
             Layout.leftMargin: Theme.s4
@@ -67,6 +69,8 @@ Item {
 
         ListView {
             id: list
+            transform: Translate { y: screen.enterOffset }
+            property bool softCards: true     // My Day cards are slightly see-through
             Layout.fillWidth: true
             Layout.fillHeight: true
             Layout.leftMargin: Theme.s3
@@ -92,7 +96,7 @@ Item {
 
             EmptyState {
                 anchors.centerIn: parent
-                visible: list.count === 0
+                visible: backend.myDayModel.count === 0   // model count: see CLAUDE.md
                 title: "All clear"
                 actionText: "Add something for tomorrow"
                 onAction: { screen.addWhen = "tomorrow"; quick.focusField() }
@@ -104,7 +108,7 @@ Item {
             Layout.fillWidth: true
             readonly property string whenLabel: screen.addWhen === "" ? "" :
                 (screen.addWhen === "tomorrow" ? "Tomorrow" : backend.dateLabel(screen.addWhen))
-            placeholder: screen.addWhen === "" ? "Add a task\u2026  (/ list, // tag)" : "Add for " + (screen.addWhen === "tomorrow" ? "tomorrow" : whenLabel) + "\u2026"
+            placeholder: screen.addWhen === "" ? "Add a task\u2026  (/ list, # tag)" : "Add for " + (screen.addWhen === "tomorrow" ? "tomorrow" : whenLabel) + "\u2026"
             chipCheckable: false
             chipChecked: screen.addWhen !== ""
             chipText: screen.addWhen === "" || screen.addWhen === "tomorrow" ? "Tomorrow" : whenLabel + "  \u2715"

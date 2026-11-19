@@ -9,6 +9,8 @@ the owner changed several things after trying the app (listed under "Decisions")
   With a console and logs: `.venv\Scripts\python -m app`. Data: `%APPDATA%\FocusStart\` (`app.log` there).
 - Tests (core only, no Qt): `.venv\Scripts\python -m pip install -r requirements-dev.txt`, then `.venv\Scripts\python -m pytest`.
 - After any QML change, run the app and check `app.log` for QML warnings (binding loops, null refs).
+- Scripted screenshots: set `QSG_RENDER_LOOP=basic`. With the default threaded loop, animations don't
+  advance while the display is off/locked, so fades, the tab underline and toasts look stuck.
 
 ## Architecture
 - `app/core/`: pure Python, no Qt. All mutations go through `service.py`. `models.py` keeps unknown
@@ -57,6 +59,10 @@ the owner changed several things after trying the app (listed under "Decisions")
   the given tasks already hold, so other views keep their order.
 - `NotesArea` pins its TextArea to `availableWidth` (contentWidth too): otherwise the ScrollView
   can size from the first layout and clip notes on the right until the window is resized.
+- Empty states bind to the *model's* `count` (e.g. `backend.myDayModel.count`), not the ListView's:
+  with delayRemove fade-outs the ListView's count isn't re-announced when the last card goes.
+- Don't bind `visible: opacity > 0` together with a `Behavior on opacity`: the hidden item's Behavior
+  never starts, so it stays at 0. `BackgroundPicture` fades its two images, not itself.
 - Esc: Main's Esc shortcut is enabled only off tab screens, so screen-level Esc shortcuts never clash
   (two enabled shortcuts with the same key both stop working).
 
@@ -77,10 +83,10 @@ the owner changed several things after trying the app (listed under "Decisions")
 - Quick-add dates: with a task typed, Tomorrow / the calendar (My Day) or a day menu pick (Upcoming)
   adds it for that date at once (one-off, `submit(when)`); with an empty field they set the sticky date.
 - Pomodoro: 25/5/15, long break every 4; starts from a Start arrow. Focus -> break advances on its
-  own with one soft chime; after a break the next focus waits (`Pomodoro.waiting`) until play or a
-  Start arrow. Durations editable live. On/off in Settings or the bar's power button (same flag). Off = bar
-  greyed out with the power button live (never hidden); power off->on is a reset that starts a fresh
-  focus session (`pomoPower`). Per task in Edit task (`extra.pomodoro_off`): no bar, no auto-start.
+  own with one soft chime. When a break ends, a full-window prompt (`BreakOverOverlay`, via the
+  `breakOver` signal) asks "Continue <task> <step>?": Continue reopens Focus and resumes; End Task
+  stops the timer and goes to My Day. The bar's square stop button stops and resets (`pomoStop`).
+  Turning the timer off is only in Settings (hidden everywhere) or Edit task (`extra.pomodoro_off`).
 - The bottom day-progress bar was removed (owner didn't like it). `core/progress.py` still computes
   done/remaining for the badges and the once-a-day "Day complete" celebration; its ratchet "floor"
   no longer drives any UI.
@@ -94,23 +100,30 @@ the owner changed several things after trying the app (listed under "Decisions")
   have task notes only. The finished-task page lists completed steps with their notes.
 - No truncation of task or step text anywhere (cards grow; the editor title wraps). Only the Focus
   step text shrinks to fit its fixed area.
-- Task title click opens Focus without starting the timer; the play arrow starts it. My Day's Done
-  pills open History.
+- Cards (My Day, Lists): click the title or a step to edit its words in place (`InlineText`); drag
+  them to reorder; click the card's edge/empty space or its progress ring to open Focus without the
+  timer; the play arrow opens Focus and starts it. "+ Step" (right, greyed) adds steps in the card,
+  on the same line as "Completed (N)" (left). Focus: click the title or the big step text to edit.
+  My Day's Done pills open History.
 - Lists tab uses the same TaskCard as My Day. Its quick-add has Tomorrow/calendar (default: no date)
   and no "/" list command (always the shown list). Upcoming ends with a "No date" section.
 - Drag and drop: My Day and list cards, steps inside cards, lists in the Lists panel, Upcoming rows
   (dropping among another day's tasks changes the date; "No date" clears it). Not tabs, not History.
 - Tags: `AppData.tags` (id, name, colour from `TAG_COLORS`, no red); tasks hold `extra.tags`.
-  Managed in Settings (rename, colour, delete). "//name" in quick-add picks/creates (sticky chips).
-  Coloured dots sit just before the task title.
+  Managed in Settings (rename, colour, delete). "#name" in quick-add picks/creates (sticky chips).
+  Coloured dots sit inline just before the title text (styled-text prefix, so they line up).
 - Repeat (Edit task): Daily / Weekdays / Weekly / Monthly in `extra.repeat`. Completing the task plans
   a fresh copy (steps unchecked, notes and tags kept) via `dates.next_occurrence`; undo removes it.
 - Pomodoro is owned by the task whose Start began it; when that task completes the timer stops and
   the top strip goes away.
 - History shows totals: this week, month, year, all time (`history.totals`).
-- Background: Settings > Background picks a folder; images rotate every 5/15/60 min or daily
-  (deterministic by time, no state), cropped to fill, under a light window-colour wash; cards go
-  more solid (`Theme.backdrop`). Off = plain.
+- Background: Settings > Background picks a folder; shown on My Day only, true colours (no wash),
+  cropped to fill, 0.1 s crossfade; rotates every 5/15/60 min or daily (deterministic by time).
+- Cards are solid (`Theme.card`) everywhere; only My Day's are very slightly see-through
+  (`Theme.cardSoft`, ListView `softCards`) and turn solid on hover (never darker).
+- "All clear": the app ring with all three segments green over a green breathing halo.
+- Tab switches slide the header and list only (`enterOffset` on My Day/Upcoming/Lists); the bottom
+  add bar stays still. Upcoming rows show the task's list next to "N of M steps left".
 - **No morning recap** (removed with its logic; old `last_recap_date`/`recap_history` keys sit in `extra`).
 - App icon (`tools/generate_images.py`): the My Day progress ring, 3 segments, 2 green, on a dark disc.
 - Focus primary button: "Step Complete" ("Task Complete" on a step-less task).

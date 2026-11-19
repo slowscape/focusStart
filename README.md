@@ -22,11 +22,13 @@ Editing `requirements.txt` also triggers a reinstall on the next launch.
   a name that doesn't exist yet becomes a new list, spelled exactly as typed. The list chip
   stays until you clear it with its ✕.
 - **Add for another day in one click:** type the task, then click Tomorrow or pick a date.
-- **Pomodoro:** starts when you press a task's Start arrow. After a break it waits for you to
-  press play. Click the time to change Focus/Short/Long minutes (applies live). Turn it on/off in
-  Settings or with its power button (off greys it out; turning it back on starts fresh), or for
-  one task in Edit task.
-- **Tags:** type `//name` when adding a task (several allowed). Manage names and colours in Settings.
+- **Pomodoro:** starts when you press a task's Start arrow. When a break ends, a full-window
+  prompt asks whether to continue (Continue, or End Task to stop the timer). Click the time to
+  change Focus/Short/Long minutes (applies live). The square button stops and resets it. Turn it
+  off in Settings (all tasks) or in Edit task (one task).
+- **Tags:** type `#name` when adding a task (several allowed). Manage names and colours in Settings.
+- **Edit in place:** click a task's title or a step to change its words. Click a card's edge or its
+  ring to open Focus without the timer; the play arrow starts the timer.
 - **Reorder:** drag a task's title, a step's text, or a list name. In Upcoming, drop a task among
   another day's tasks to move it to that day.
 - **Repeat:** Edit task > Repeat. When you finish it, the next copy is planned automatically.

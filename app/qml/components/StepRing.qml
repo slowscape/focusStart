@@ -7,20 +7,22 @@ Canvas {
     property int total: 0
     property int done: 0
     property real shown: done
+    property real lineWidth: 3
     implicitWidth: 26
     implicitHeight: 26
     Behavior on shown { NumberAnimation { duration: Theme.durSlow; easing.type: Easing.OutCubic } }
     onShownChanged: requestPaint()
     onTotalChanged: requestPaint()
+    onWidthChanged: requestPaint()
     Connections { target: Theme; function onAccentChanged() { ring.requestPaint() } function onWindowColorChanged() { ring.requestPaint() } }
     onPaint: {
         var ctx = getContext("2d")
         ctx.reset()
         if (total <= 0) return
-        var cx = width / 2, cy = height / 2, r = Math.min(width, height) / 2 - 2.5
+        var cx = width / 2, cy = height / 2, r = Math.min(width, height) / 2 - lineWidth / 2 - 1
         var gap = total > 1 ? Math.min(0.35, 1.2 / total) : 0
         var seg = (Math.PI * 2) / total
-        ctx.lineWidth = 3
+        ctx.lineWidth = ring.lineWidth
         ctx.lineCap = "butt"
         for (var i = 0; i < total; i++) {
             var start = -Math.PI / 2 + i * seg + gap / 2

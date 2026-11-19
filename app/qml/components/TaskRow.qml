@@ -11,6 +11,7 @@ ItemDelegate {
     required property string title
     required property string listId
     required property string dateLabel
+    required property string listName
     required property string plannedDate
     required property int stepTotal
     required property int stepDone
@@ -67,6 +68,7 @@ ItemDelegate {
             Label {
                 property var bits: [
                     row.showDate && row.dateLabel ? row.dateLabel : "",
+                    row.listName,
                     row.stepTotal > 0 ? (row.stepTotal - row.stepDone) + " of " + Theme.plural(row.stepTotal, "step") + " left" : ""
                 ].filter(function (s) { return s !== "" })
                 visible: bits.length > 0

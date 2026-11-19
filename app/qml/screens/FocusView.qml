@@ -18,6 +18,7 @@ Item {
     readonly property int bottomInset: 56
     readonly property bool finished: justFinished && info.exists && info.done
     readonly property bool editing: notes.editing || stepNotes.editing || addField.activeFocus
+                                    || titleText.editing || stepEditor.visible
     readonly property var steps: info.steps || []
     readonly property var remaining: steps.filter(function (s) { return !s.done })
     // The selected step (done or not), else the first to-do step.
@@ -92,12 +93,19 @@ Item {
             ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 0
-                Label {
+                InlineText {
+                    id: titleText
                     Layout.fillWidth: true
                     text: screen.info.title || ""
-                    font.pixelSize: Theme.fontTitle - 2
-                    font.weight: Font.DemiBold
-                    wrapMode: Text.Wrap
+                    pixelSize: Theme.fontTitle - 2
+                    weight: Font.DemiBold
+                    onCommitted: (t) => backend.setTitle(screen.taskId, t)
+                    MouseArea {
+                        anchors.fill: parent
+                        visible: !titleText.editing
+                        cursorShape: Qt.IBeamCursor
+                        onClicked: titleText.start()
+                    }
                 }
                 Label { text: screen.info.listName || ""; color: Theme.subtext; font.pixelSize: Theme.fontSmall }
             }
@@ -105,7 +113,8 @@ Item {
         }
 
         // ---------------- Pomodoro
-        PomodoroBar { Layout.fillWidth: true; visible: screen.info.pomodoro === true }
+        // Hidden when the timer is off in Settings or for this task (Edit task).
+        PomodoroBar { Layout.fillWidth: true; visible: backend.pomoEnabled && screen.info.pomodoro === true }
 
         // ---------------- step bar: one segment per step, in order
         Row {
@@ -164,6 +173,7 @@ Item {
             }
             Label {
                 id: stepText
+                visible: !stepEditor.visible
                 width: parent.width
                 height: parent.height - 22
                 anchors.verticalCenter: parent.verticalCenter
@@ -177,6 +187,45 @@ Item {
                 elide: Text.ElideRight
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
+            }
+            // Click the step (or the title of a task without steps) to edit its words here.
+            MouseArea {
+                anchors.fill: stepText
+                visible: !screen.finished && !stepEditor.visible
+                cursorShape: Qt.IBeamCursor
+                onClicked: {
+                    stepEditor.editStepId = screen.current ? screen.current.id : ""
+                    stepEditor.text = stepText.text
+                    stepEditor.visible = true
+                    stepEditor.forceActiveFocus()
+                    stepEditor.cursorPosition = stepEditor.text.length
+                }
+            }
+            StepInput {
+                id: stepEditor
+                property string editStepId: ""
+                visible: false
+                anchors.verticalCenter: parent.verticalCenter
+                width: parent.width
+                font.pixelSize: Theme.fontTitle
+                font.weight: Font.DemiBold
+                horizontalAlignment: Text.AlignHCenter
+                function finish(save) {
+                    if (!visible) return
+                    visible = false
+                    var t = text.trim()
+                    if (!save || t === "") return
+                    if (editStepId) backend.editStep(screen.taskId, editStepId, t)
+                    else backend.setTitle(screen.taskId, t)
+                    screen.forceActiveFocus()
+                }
+                onAccepted: finish(true)
+                onActiveFocusChanged: if (!activeFocus) finish(true)
+                Keys.onEscapePressed: finish(false)
+                Keys.onShortcutOverride: (e) => {
+                    if ([Qt.Key_Escape, Qt.Key_Return, Qt.Key_Enter, Qt.Key_Space, Qt.Key_Left, Qt.Key_Right].indexOf(e.key) >= 0)
+                        e.accepted = true
+                }
             }
             ParallelAnimation {
                 id: stepSwap

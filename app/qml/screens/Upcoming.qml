@@ -6,7 +6,8 @@ import "../theme"
 
 Item {
     id: screen
-    readonly property int bottomInset: quick.height   // undo/info messages sit above the add box
+    readonly property int bottomInset: quick.height
+    property real enterOffset: 0      // page-enter slide for header and list (not the add bar)   // undo/info messages sit above the add box
     property string addDate: ""          // ISO; empty = tomorrow
     property bool focusQuickAdd: false
     readonly property string addLabel: addDate === "" ? "Tomorrow" : backend.dateLabel(addDate)
@@ -30,6 +31,7 @@ Item {
         anchors.fill: parent
         spacing: 0
         Label {
+            transform: Translate { y: screen.enterOffset }
             text: "Upcoming"
             font.pixelSize: Theme.fontHero
             font.weight: Font.DemiBold
@@ -39,6 +41,7 @@ Item {
         }
         ListView {
             id: list
+            transform: Translate { y: screen.enterOffset }
             Layout.fillWidth: true
             Layout.fillHeight: true
             clip: true
@@ -68,7 +71,7 @@ Item {
             Label {
                 anchors.centerIn: parent
                 width: parent.width - 2 * Theme.s6
-                visible: list.count === 0
+                visible: backend.upcomingModel.count === 0   // model count: see CLAUDE.md
                 horizontalAlignment: Text.AlignHCenter
                 wrapMode: Text.Wrap
                 text: "Nothing planned ahead. Add something below whenever you like."

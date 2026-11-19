@@ -22,7 +22,6 @@ ApplicationWindow {
     Binding { target: Theme; property: "windowColor"; value: appWindow.palette.window }
     Binding { target: Theme; property: "textColor"; value: appWindow.palette.windowText }
     Binding { target: Theme; property: "effects"; value: backend.effects }
-    Binding { target: Theme; property: "backdrop"; value: backend.bgImage !== "" }
 
     // ----------------------------------------------------------- navigation
     readonly property var tabs: ["myday", "upcoming", "lists", "history"]
@@ -141,6 +140,11 @@ ApplicationWindow {
     Connections {
         target: backend
         function onDayCompleteRevoked() { dayOverlay.hide() }
+        function onBreakOver(taskId) {
+            breakOver.show(taskId)
+            appWindow.raise()            // bring the window forward (Windows may only flash it)
+            appWindow.alert(0)
+        }
     }
     onActiveChanged: backend.windowActiveChanged(active)
 
@@ -156,23 +160,15 @@ ApplicationWindow {
         // Only enabled when it has something to do, so it never clashes with a
         // screen's own Esc (e.g. closing the Lists side panel).
         sequence: "Esc"
-        enabled: !dayOverlay.open && (!appWindow.tabScreen || appWindow.screen === "settings")
+        enabled: !dayOverlay.open && !breakOver.open && (!appWindow.tabScreen || appWindow.screen === "settings")
         onActivated: appWindow.back()
     }
 
     // -------------------------------------------------------------- layout
-    // Optional background picture (Settings > Background), cropped to fill and centred,
-    // under a light wash of the window colour so text stays readable.
-    Image {
+    // Optional background picture (Settings > Background), on My Day only, in true colours.
+    BackgroundPicture {
         anchors.fill: parent
-        visible: source !== ""
-        source: backend.bgImage
-        fillMode: Image.PreserveAspectCrop
-        horizontalAlignment: Image.AlignHCenter
-        verticalAlignment: Image.AlignVCenter
-        asynchronous: true
-        sourceSize.width: 1600          // plenty for a side-of-screen window; keeps memory low
-        Rectangle { anchors.fill: parent; color: Theme.windowColor; opacity: 0.35 }
+        source: appWindow.screen === "myday" ? backend.bgImage : ""
     }
 
     ColumnLayout {
@@ -260,9 +256,17 @@ ApplicationWindow {
                 function load() {
                     setSource(Qt.resolvedUrl(appWindow.screenFiles[appWindow.screen]), appWindow.screenParams)
                 }
-                onLoaded: enter.restart()
                 // Slide only. Never animate the whole page's opacity: it dims the entire
-                // window for a moment, which reads as a flash.
+                // window for a moment, which reads as a flash. Screens with a bottom add bar
+                // expose `enterOffset` (applied to their header and list only), so the bar
+                // stays still; other screens slide as a whole.
+                onLoaded: {
+                    var hasOwn = item && item.enterOffset !== undefined
+                    enter.target = hasOwn ? item : loader
+                    enter.property = hasOwn ? "enterOffset" : "y"
+                    loader.y = 0
+                    enter.restart()
+                }
                 NumberAnimation {
                     id: enter
                     target: loader; property: "y"
@@ -295,6 +299,17 @@ ApplicationWindow {
         anchors.horizontalCenter: parent.horizontalCenter
         baseY: appWindow.height - height - ((loader.item && loader.item.bottomInset) ? loader.item.bottomInset + 20 : 24)
         onUndoRequested: (token) => appWindow.undo(token)
+    }
+
+    BreakOverOverlay {
+        id: breakOver
+        anchors.fill: parent
+        z: 80
+        onContinueTask: (taskId) => {
+            if (taskId) appWindow.openFocus(taskId)    // Start resumes the waiting session
+            else backend.pomoTogglePause()
+        }
+        onEndTask: { backend.pomoStop(); appWindow.go("myday") }
     }
 
     DayCompleteOverlay {

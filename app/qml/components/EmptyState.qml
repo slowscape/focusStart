@@ -3,7 +3,8 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import "../theme"
 
-// Calm empty state: a softly breathing check, a title and an optional action.
+// Calm empty state: the app's ring with all three segments done (green) over a softly
+// breathing green halo, a title and an optional action.
 ColumnLayout {
     id: es
     property string title: "All clear"
@@ -18,20 +19,19 @@ ColumnLayout {
             id: halo
             anchors.centerIn: parent
             width: 88; height: 88; radius: 44
-            color: Theme.accent
-            opacity: 0.10
+            color: Theme.success
+            opacity: 0.14
             SequentialAnimation on scale {
                 running: Theme.motion; loops: Animation.Infinite
                 NumberAnimation { from: 0.9; to: 1.06; duration: 2200; easing.type: Easing.InOutSine }
                 NumberAnimation { from: 1.06; to: 0.9; duration: 2200; easing.type: Easing.InOutSine }
             }
         }
-        Rectangle {
+        StepRing {
             anchors.centerIn: parent
-            width: 56; height: 56; radius: 28
-            color: Theme.accent
-            opacity: 0.9
-            Icon { anchors.centerIn: parent; name: "check"; size: 24; color: "white" }
+            width: 60; height: 60
+            lineWidth: 6
+            total: 3; done: 3
         }
     }
     Label {

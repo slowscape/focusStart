@@ -50,6 +50,7 @@ class Backend(QObject):
     pomodoroChanged = Signal()
     historyChanged = Signal()
     backgroundChanged = Signal()
+    breakOver = Signal(str)       # a break ended; the task to continue (may be "")
 
     def __init__(self, service: Service, store: Store, sounds: SoundBank,
                  notice: str | None = None, first_run: bool = False, parent=None):
@@ -745,8 +746,12 @@ class Backend(QObject):
         self.pomodoroChanged.emit()
 
     def _pomo_tick(self):
-        if self._pomo.tick(self._pomo_now()):
-            self._sound("chime")  # one gentle chime per change; nothing to dismiss
+        entered = self._pomo.tick(self._pomo_now())
+        if entered:
+            self._sound("chime")  # one gentle chime per change
+            if self._pomo.waiting:  # break over: ask whether to carry on
+                task = self._pomo_task or self._focus_task or ""
+                self.breakOver.emit(task if self.svc.task(task) else "")
         self._pomo_emit()         # stops the ticker while the next session waits for Start
 
     pomoEnabled = Property(bool, lambda self: self._pomo_settings()["enabled"], notify=pomodoroChanged)
@@ -798,14 +803,12 @@ class Backend(QObject):
             self._pomo.pause(now)
         self._pomo_emit()
 
-    @Slot(bool)
-    def pomoPower(self, on: bool):
-        """The bar's power button. Off stops and resets; on starts a fresh focus session."""
-        self.pomoSetEnabled(on)
-        if on:
-            self._pomo.start(self._pomo_now())
-            self._pomo_task = self._focus_task or None
-            self._pomo_emit()
+    @Slot()
+    def pomoStop(self):
+        """The bar's stop button (and "End Task" after a break): stop and reset the timer."""
+        self._pomo.stop()
+        self._pomo_task = None
+        self._pomo_emit()
 
     @Slot(bool)
     def pomoSetEnabled(self, on: bool):

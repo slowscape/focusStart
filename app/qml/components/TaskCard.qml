@@ -4,9 +4,11 @@ import QtQuick.Layouts
 import "../theme"
 
 // Task card (My Day and Lists). Nothing is cut short: the card grows to show the whole
-// title and every remaining step. Click the title to open Focus (without starting the
-// timer); drag the title to reorder cards; drag a step's text to reorder steps.
-// Start (play) opens Focus and starts the timer; "..." opens the task menu.
+// title and every remaining step.
+//   click the title or a step  -> edit its words in place
+//   drag the title / a step    -> reorder cards / steps
+//   click the card's edge or its progress ring -> open Focus (timer not started)
+//   play -> open Focus and start the timer; "..." -> task menu; "+ Step" -> add steps here
 Rectangle {
     id: card
     required property string itemId
@@ -31,19 +33,28 @@ Rectangle {
     implicitHeight: col.implicitHeight + 2 * Theme.s3
     height: implicitHeight
     radius: Theme.radius
-    color: Theme.card
+    // Set by My Day's list: slightly see-through until hovered. Never darker on hover.
+    readonly property bool soft: ListView.view ? (ListView.view.softCards === true) : false
+    color: soft && !cardHover.hovered && !titleDrag.dragging ? Theme.cardSoft : Theme.card
     border.color: titleDrag.dragging ? Theme.accent : Theme.cardBorder
     clip: true
     transform: Translate { y: titleDrag.offset }
     scale: titleDrag.dragging ? 1.02 : 1
     Behavior on scale { NumberAnimation { duration: Theme.durFast } }
 
-    Rectangle {
-        anchors.fill: parent; radius: parent.radius
-        color: Theme.hover
-        visible: cardHover.hovered
-    }
     HoverHandler { id: cardHover }
+    // The card's edge and empty space open Focus without starting the timer.
+    MouseArea {
+        anchors.fill: parent
+        cursorShape: Qt.PointingHandCursor
+        onClicked: appWindow.openFocus(card.itemId, false, true)
+    }
+    function tagPrefix() {
+        var out = ""
+        for (var i = 0; i < card.tagColors.length; i++)
+            out += '<font color="' + card.tagColors[i] + '">●</font>'
+        return out === "" ? "" : out + "&nbsp;"
+    }
 
     ColumnLayout {
         id: col
@@ -68,34 +79,35 @@ Rectangle {
                 Layout.topMargin: 3
                 Layout.leftMargin: 2
                 Layout.rightMargin: 2
+                TapHandler { onTapped: appWindow.openFocus(card.itemId, false, true) }
+                HoverHandler { cursorShape: Qt.PointingHandCursor }
             }
-            TagDots {
-                colors: card.tagColors
-                names: card.tagNames
-                Layout.alignment: Qt.AlignTop
-                Layout.topMargin: 9
-            }
-            Label {
-                id: titleLabel
+            // Title: tag dots sit inline before the words (so they line up with the text).
+            InlineText {
+                id: titleText
                 Layout.fillWidth: true
                 Layout.alignment: Qt.AlignVCenter
-                text: card.title + (card.repeat !== "" ? "  ↻" : "")
-                wrapMode: Text.Wrap
-                font.pixelSize: Theme.fontBody + 1
-                font.weight: Font.DemiBold
+                text: card.title
+                richPrefix: card.tagPrefix()
+                suffix: card.repeat !== "" ? "  ↻" : ""
+                pixelSize: Theme.fontBody + 1
+                weight: Font.DemiBold
+                onCommitted: (t) => backend.setTitle(card.itemId, t)
                 ReorderArea {
                     id: titleDrag
                     anchors.fill: parent
+                    enabled: !titleText.editing
+                    cursorShape: dragging ? Qt.ClosedHandCursor : Qt.IBeamCursor
                     row: card
                     view: card.ListView.view
                     index: card.index
                     indicator: card.ListView.view ? (card.ListView.view.dropLine || null) : null
-                    onTapped: appWindow.openFocus(card.itemId, false, true)
+                    onTapped: titleText.start()
                     onDropped: (from, to) => card.reorder(from, to)
                 }
-                ToolTip.visible: titleDrag.containsMouse && !titleDrag.dragging
-                ToolTip.delay: 900
-                ToolTip.text: "Click to open · drag to move"
+                ToolTip.visible: titleDrag.containsMouse && !titleDrag.dragging && card.tagNames.length > 0
+                ToolTip.delay: 700
+                ToolTip.text: card.tagNames.map(function (n) { return "#" + n }).join("  ")
             }
             // Start and "..." sit together as one compact pair.
             RowLayout {
@@ -139,26 +151,62 @@ Rectangle {
             // behind the title, then drop back down).
             Rectangle { id: stepLine; visible: false; z: 50; width: parent.width; height: 2; radius: 1; color: Theme.accent }
         }
-        // Completed steps, rolled up. Open/closed is remembered per task; new tasks start closed.
-        AbstractButton {
-            id: doneToggle
-            visible: card.stepDone > 0
-            Layout.leftMargin: 4
+        // One line: "Completed (N)" on the left (once steps are done), "+ Step" on the right.
+        RowLayout {
+            Layout.fillWidth: true
+            visible: card.hasSteps
             Layout.topMargin: 2
-            implicitHeight: 26
-            implicitWidth: doneRow.implicitWidth
-            hoverEnabled: true
-            onClicked: backend.setCompletedOpen(card.itemId, !card.completedOpen)
-            contentItem: RowLayout {
-                id: doneRow
-                spacing: Theme.s1
-                Icon { name: card.completedOpen ? "chevron" : "chevronR"; size: 10; color: Theme.subtext }
-                Label {
-                    text: "Completed (" + card.stepDone + ")"
-                    color: doneToggle.hovered ? Theme.textColor : Theme.subtext
+            // Completed steps, rolled up. Open/closed is remembered per task; new tasks start closed.
+            AbstractButton {
+                id: doneToggle
+                visible: card.stepDone > 0
+                Layout.leftMargin: 4
+                implicitHeight: 26
+                implicitWidth: doneRow.implicitWidth
+                hoverEnabled: true
+                onClicked: backend.setCompletedOpen(card.itemId, !card.completedOpen)
+                contentItem: RowLayout {
+                    id: doneRow
+                    spacing: Theme.s1
+                    Icon { name: card.completedOpen ? "chevron" : "chevronR"; size: 10; color: Theme.subtext }
+                    Label {
+                        text: "Completed (" + card.stepDone + ")"
+                        color: doneToggle.hovered ? Theme.textColor : Theme.subtext
+                        font.pixelSize: Theme.fontSmall
+                    }
+                }
+            }
+            Item { Layout.fillWidth: true }
+            AbstractButton {
+                id: addStepBtn
+                implicitHeight: 26
+                implicitWidth: addStepLabel.implicitWidth + 8
+                hoverEnabled: true
+                onClicked: { addStepField.visible = true; addStepField.forceActiveFocus() }
+                contentItem: Label {
+                    id: addStepLabel
+                    text: "+ Step"
+                    horizontalAlignment: Text.AlignRight
+                    verticalAlignment: Text.AlignVCenter
+                    color: addStepBtn.hovered ? Theme.textColor : Theme.subtext
                     font.pixelSize: Theme.fontSmall
                 }
             }
+        }
+        // Add steps right here: Enter adds and stays open for the next; Esc or an empty Enter closes.
+        StepInput {
+            id: addStepField
+            visible: false
+            Layout.fillWidth: true
+            placeholderText: "Another step…"
+            onAccepted: {
+                if (text.trim()) { backend.addStep(card.itemId, text.trim()); clear() }
+                else visible = false
+            }
+            onCancelled: visible = false
+            onActiveFocusChanged: if (!activeFocus && text.trim() === "") visible = false
+            Keys.onShortcutOverride: (e) => { if (e.key === Qt.Key_Escape) e.accepted = true }
+            Keys.onEscapePressed: { clear(); visible = false }
         }
         Repeater {
             model: card.completedOpen ? card.doneSteps : null

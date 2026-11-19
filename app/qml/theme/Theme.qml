@@ -9,9 +9,10 @@ QtObject {
     readonly property bool dark: windowColor.hslLightness < 0.5
 
     readonly property color subtext: dark ? Qt.rgba(1, 1, 1, 0.62) : Qt.rgba(0, 0, 0, 0.58)
-    property bool backdrop: false     // a background picture is showing: cards go solid
-    readonly property color card: backdrop ? (dark ? Qt.rgba(0.16, 0.16, 0.16, 0.92) : Qt.rgba(1, 1, 1, 0.92))
-                                           : (dark ? Qt.rgba(1, 1, 1, 0.055) : Qt.rgba(1, 1, 1, 0.75))
+    // Cards are solid everywhere. Only My Day's cards are very slightly see-through (like
+    // Microsoft To Do over its background picture); on hover they turn fully solid.
+    readonly property color card: dark ? "#2b2b2b" : "#ffffff"
+    readonly property color cardSoft: dark ? Qt.rgba(0.169, 0.169, 0.169, 0.93) : Qt.rgba(1, 1, 1, 0.93)
     readonly property color cardBorder: dark ? Qt.rgba(1, 1, 1, 0.08) : Qt.rgba(0, 0, 0, 0.07)
     readonly property color hover: dark ? Qt.rgba(1, 1, 1, 0.06) : Qt.rgba(0, 0, 0, 0.04)
     readonly property color track: dark ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(0, 0, 0, 0.08)
@@ -69,6 +70,7 @@ QtObject {
         "menu":     ["\uE700", "\u2630"],
         "pause":    ["\uE769", "\u275A\u275A"],
         "power":    ["\uE7E8", "\u23FB"],
+        "stop":     ["\uE71A", "\u25A0"],
         "timer":    ["\uE916", "\u23F1"],
         "grip":     ["\uE76F", "\u2261"],
         "print":    ["\uE749", "\u2399"]

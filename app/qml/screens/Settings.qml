@@ -59,7 +59,7 @@ Item {
                 color: Theme.subtext
                 font.pixelSize: Theme.fontSmall
                 text: backend.pomoEnabled ? "Starts when you press a task's Start arrow. You can also turn it off for one task in Edit task."
-                                          : "Shown greyed out. Turn it on here or with its power button."
+                                          : "Hidden everywhere."
             }
 
             // ---------------- tags
@@ -69,7 +69,7 @@ Item {
                 wrapMode: Text.Wrap
                 color: Theme.subtext
                 font.pixelSize: Theme.fontSmall
-                text: "Type //name when adding a task to tag it. Click a dot to change its colour."
+                text: "Type #name when adding a task to tag it. Click a dot to change its colour."
             }
             Repeater {
                 model: backend.tagsModel

@@ -3,19 +3,18 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import "../theme"
 
-// Compact Pomodoro timer. Focus -> break advances on its own with one soft chime; after a
-// break the next focus session waits for Start. Tap the time to change durations (live).
-// Off (power button or Settings): greyed out, power button still live. Power off then on
-// is also a reset: a fresh focus session starts. Hidden only when off for this task.
+// Compact Pomodoro timer. Focus -> break advances on its own with one soft chime. When a
+// break ends, a full-window "Continue?" prompt appears (BreakOverOverlay in Main.qml).
+// Tap the time to change durations (live). The square stop button stops and resets it.
+// Turning the timer off entirely is only in Settings (all tasks) or Edit task (one task);
+// then the screen hides this bar.
 Rectangle {
     id: bar
-    readonly property bool on: backend.pomoEnabled
     readonly property string phase: backend.pomoPhase
-    readonly property bool onBreak: on && (phase === "short" || phase === "long")
+    readonly property bool onBreak: phase === "short" || phase === "long"
     implicitHeight: 44
     radius: Theme.radius
-    color: !on ? Theme.hover
-         : onBreak ? Qt.rgba(Theme.success.r, Theme.success.g, Theme.success.b, 0.14)
+    color: onBreak ? Qt.rgba(Theme.success.r, Theme.success.g, Theme.success.b, 0.14)
                    : Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.12)
     function fmt(sec) { return Math.floor(sec / 60) + ":" + ("0" + sec % 60).slice(-2) }
 
@@ -26,15 +25,13 @@ Rectangle {
         spacing: Theme.s2
         ColumnLayout {
             spacing: 0
-            opacity: bar.on ? 1 : 0.45
             Label {
-                text: !bar.on ? "Timer off"
-                      : backend.pomoWaiting ? "Ready when you are"
+                text: backend.pomoWaiting ? "Ready when you are"
                       : bar.phase === "work" ? "Focus" : bar.phase === "short" ? "Short break"
                       : bar.phase === "long" ? "Long break" : "Ready"
                 font.pixelSize: Theme.fontSmall
                 font.weight: Font.DemiBold
-                color: !bar.on ? Theme.subtext : bar.onBreak ? Theme.success : Theme.accent
+                color: bar.onBreak ? Theme.success : Theme.accent
             }
             Row {  // focus sessions done in this cycle
                 spacing: 3
@@ -58,11 +55,11 @@ Rectangle {
             background: Rectangle { radius: 6; color: timeButton.hovered ? Theme.hover : "transparent" }
             contentItem: Label {
                 id: timeLabel
-                text: bar.fmt(bar.on && backend.pomoRunning ? backend.pomoRemaining : backend.pomoWork * 60)
+                text: bar.fmt(backend.pomoRunning ? backend.pomoRemaining : backend.pomoWork * 60)
                 font.pixelSize: Theme.fontTitle
                 font.weight: Font.DemiBold
                 font.features: { "tnum": 1 }
-                opacity: !bar.on ? 0.4 : backend.pomoPaused ? 0.5 : 1
+                opacity: backend.pomoPaused ? 0.5 : 1
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
             }
@@ -74,15 +71,15 @@ Rectangle {
             icon_: backend.pomoRunning && !backend.pomoPaused ? "pause" : "play"
             tip: backend.pomoRunning && !backend.pomoPaused ? "Pause" : (backend.pomoRunning ? "Resume" : "Start")
             iconSize: 14
-            enabled: bar.on
             onClicked: backend.pomoTogglePause()
         }
         IconButton {
-            icon_: "power"
-            tip: bar.on ? "Turn timer off (resets it)" : "Turn timer on (starts fresh)"
-            iconSize: 14
-            iconColor: bar.on ? Theme.subtext : Theme.accent
-            onClicked: backend.pomoPower(!bar.on)
+            icon_: "stop"
+            tip: "Stop and reset"
+            iconSize: 12
+            iconColor: Theme.subtext
+            enabled: backend.pomoRunning
+            onClicked: backend.pomoStop()
         }
     }
 

@@ -9,7 +9,7 @@ import "../theme"
 // case-insensitively. Up/Down + Enter/Tab (or click) picks one; if nothing matches,
 // "Create" makes a new list named exactly as typed. "/word" typed without picking
 // also works on Enter. The chosen list stays as a chip until cleared.
-// "//" command: the same for tags (several allowed; new names become tags on submit).
+// "#" command: the same for tags (several allowed; new names become tags on submit).
 // Chips have their own row above the field, so the field keeps its full width and never
 // moves: the field row is pinned to the bottom and the component grows upward.
 //
@@ -44,7 +44,6 @@ Rectangle {
 
     // ----- slash suggestions
     property int slashPos: -1
-    property int slashLen: 1           // 1 = "/" (list), 2 = "//" (tag)
     property string query: ""
     property var options: []
     property int highlighted: 0
@@ -54,13 +53,12 @@ Rectangle {
 
     function updateSlash() {
         var t = field.text, cur = field.cursorPosition
-        var i = t.lastIndexOf("/", cur - 1)
-        if (i < 0) { slashPos = -1; return }
-        var tag = i > 0 && t.charAt(i - 1) === "/"
-        var start = tag ? i - 1 : i
-        if (start > 0 && t.charAt(start - 1) !== " ") { slashPos = -1; return }
+        // The nearest "/" (list) or "#" (tag) before the cursor, at the start or after a space.
+        var i = Math.max(t.lastIndexOf("/", cur - 1), t.lastIndexOf("#", cur - 1))
+        if (i < 0 || (i > 0 && t.charAt(i - 1) !== " ")) { slashPos = -1; return }
+        var tag = t.charAt(i) === "#"
         if (!tag && !allowLists) { slashPos = -1; return }
-        if (start === dismissedAt && t.substring(0, start) === dismissedPrefix) { slashPos = -1; return }
+        if (i === dismissedAt && t.substring(0, i) === dismissedPrefix) { slashPos = -1; return }
         dismissedAt = -1
         var q = t.substring(i + 1, cur)
         var matches = tag ? backend.tagMatches(q) : backend.listMatches(q)
@@ -70,12 +68,12 @@ Rectangle {
         var opts = matches.map(function (m) { return { kind: kind, id: m.id, name: m.name, color: m.color || "", create: false } })
         var exact = matches.some(function (m) { return m.name.toLowerCase() === q.trim().toLowerCase() })
         if (q.trim() !== "" && !exact) opts.push({ kind: kind, id: "", name: q.trim(), color: "", create: true })
-        slashPos = start; slashLen = tag ? 2 : 1; query = q; options = opts
+        slashPos = i; query = q; options = opts
         highlighted = 0
     }
     function choose(opt) {
         var t = field.text
-        var end = slashPos + slashLen + query.length
+        var end = slashPos + 1 + query.length
         field.text = (t.substring(0, slashPos) + t.substring(end)).replace(/\s{2,}/g, " ").replace(/^\s+/, "")
         field.cursorPosition = Math.min(slashPos, field.text.length)
         if (opt.kind === "tag") addTagChip({ id: opt.id, name: opt.name, color: opt.color })
@@ -84,9 +82,9 @@ Rectangle {
         slashPos = -1
         field.forceActiveFocus()
     }
-    // "//word" and "/word" typed without picking from the suggestions.
-    readonly property var _tagRe: /(^|\s)\/\/(\S+)/g
-    readonly property var _listRe: /(^|\s)\/([^\s\/]\S*)/
+    // "#word" and "/word" typed without picking from the suggestions.
+    readonly property var _tagRe: /(^|\s)#(\S+)/g
+    readonly property var _listRe: /(^|\s)\/(\S+)/
     // The task text that would be added (commands removed); "" if there's none.
     function taskText() {
         var t = field.text.replace(_tagRe, " ")

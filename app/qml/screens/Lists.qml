@@ -6,7 +6,8 @@ import "../theme"
 
 Item {
     id: screen
-    readonly property int bottomInset: quick.height   // undo/info messages sit above the add box
+    readonly property int bottomInset: quick.height
+    property real enterOffset: 0      // page-enter slide for header and list (not the add bar)   // undo/info messages sit above the add box
     property bool drawerOpen: false
     // Date for the next add: "" = no date, "tomorrow", or an ISO date.
     property string addWhen: ""
@@ -19,6 +20,7 @@ Item {
         spacing: 0
 
         RowLayout {
+            transform: Translate { y: screen.enterOffset }
             Layout.fillWidth: true
             Layout.leftMargin: Theme.s2
             Layout.rightMargin: Theme.s2
@@ -53,6 +55,7 @@ Item {
         // Same cards as My Day: steps inline, check them off, drag titles to reorder.
         ListView {
             id: list
+            transform: Translate { y: screen.enterOffset }
             Layout.fillWidth: true
             Layout.fillHeight: true
             Layout.leftMargin: Theme.s3
@@ -76,7 +79,7 @@ Item {
             }
             Label {
                 anchors.centerIn: parent
-                visible: list.count === 0
+                visible: backend.listTasksModel.count === 0   // model count: see CLAUDE.md
                 text: "This list is clear."
                 color: Theme.subtext
             }

@@ -5,7 +5,8 @@ import "../theme"
 
 // One remaining step, inline in a card. Checking it: check animation + effect,
 // then the row fades and collapses away (ListView remove, via delayRemove).
-// The whole step text is shown (wraps, never cut short). Drag the text to reorder.
+// The whole step text is shown (wraps, never cut short). Click the text to edit it in
+// place; drag it to reorder.
 Item {
     id: row
     required property string itemId
@@ -30,17 +31,19 @@ Item {
             Layout.alignment: Qt.AlignVCenter
             onToggledOn: row.completed(check)
         }
-        Label {
+        InlineText {
             id: label
             Layout.fillWidth: true
             text: row.text
-            wrapMode: Text.Wrap
-            font.pixelSize: Theme.fontBody
+            pixelSize: Theme.fontBody
             color: drag.dragging ? Theme.accent : Theme.textColor
+            onCommitted: (t) => backend.editStep(row.taskId, row.itemId, t)
             ReorderArea {
                 id: drag
                 anchors.fill: parent
-                cursorShape: dragging ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+                enabled: !label.editing
+                cursorShape: dragging ? Qt.ClosedHandCursor : Qt.IBeamCursor
+                onTapped: label.start()
                 row: row
                 view: row.ListView.view
                 index: row.index

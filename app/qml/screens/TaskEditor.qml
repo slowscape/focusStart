@@ -169,7 +169,7 @@ Item {
                         }
                         Label {
                             visible: backend.tagsModel.count === 0
-                            text: "No tags yet. Add some in Settings, or type //name when adding a task."
+                            text: "No tags yet. Add some in Settings, or type #name when adding a task."
                             color: Theme.subtext
                             font.pixelSize: Theme.fontSmall
                             wrapMode: Text.Wrap
