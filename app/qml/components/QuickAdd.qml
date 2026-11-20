@@ -284,7 +284,11 @@ Rectangle {
             flat: true
             focusPolicy: Qt.TabFocus
             onClicked: qa.calendarClicked()
-            contentItem: Icon { name: "calendar"; size: 14 }
+            // Icon centres itself; Fluent's padding/insets are uneven and put the circle and
+            // the icon on different centres.
+            padding: 0
+            topInset: 0; bottomInset: 0; leftInset: 0; rightInset: 0
+            contentItem: Icon { name: "calendar"; size: 16 }
             ToolTip.visible: hovered
             ToolTip.delay: 500
             ToolTip.text: "Pick a date"

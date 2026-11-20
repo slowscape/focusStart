@@ -10,6 +10,8 @@ ToolButton {
     property color iconColor: Theme.textColor
     focusPolicy: Qt.TabFocus
     implicitWidth: 36
+    // No style padding: Fluent's is uneven, which nudged icons off-centre. Icon centres itself.
+    padding: 0
     implicitHeight: 36
     contentItem: Icon { name: b.icon_; size: b.iconSize; color: b.iconColor; opacity: b.enabled ? 1 : 0.4 }
     ToolTip.visible: tip !== "" && hovered

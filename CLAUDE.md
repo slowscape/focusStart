@@ -68,6 +68,10 @@ the owner changed several things after trying the app (listed under "Decisions")
 - Icons: bundled `app/assets/fonts/StepTaskIcons.ttf` (Fluent UI System Icons, MIT, 20 px regular),
   only the glyphs in `tools/subset_icons.py` ICONS. Adding an icon = add it there, rerun the tool,
   paste the printed table into `Theme.glyphs`. Don't rely on Windows' Segoe Fluent Icons.
+  Centring (`Icon.qml`): Qt mis-measures this font per axis. Horizontal uses Qt's TextMetrics ink
+  box (Qt draws without the glyph's left margin); vertical uses the ink centre from the outlines
+  (third value in each `Theme.glyphs` row). Glyphs are drawn at 1.3x `size`. Buttons hosting an Icon
+  set `padding: 0` (Fluent's is uneven).
 - `launch.sh`/`launch.command` must keep LF line endings (`.gitattributes`) and the git executable bit.
 - `main.pick_style` falls back to Fusion if this PySide6 build lacks FluentWinUI3, so the window still
   opens. Data folder per OS in `main.data_base_dir` (macOS Application Support, Linux XDG).
@@ -135,6 +139,9 @@ the owner changed several things after trying the app (listed under "Decisions")
 - **No morning recap** (removed with its logic; old `last_recap_date`/`recap_history` keys sit in `extra`).
 - App icon (`tools/generate_images.py`): the My Day progress ring, 3 segments, 2 green, on a dark disc.
 - Focus primary button: "Step Complete" ("Task Complete" on a step-less task).
+- Finishing a task in Focus shows a full-screen "Task complete" view: the task's ring with every
+  segment green (one full ring for a step-less task), its title, "All N steps done", then
+  "Next up: ..." / "Back to My Day". Never auto-advances.
 - Print: My Day header print icon, Lists "..." menu. Saves a checklist PDF (18 pt, empty checkbox per
   task and remaining step) via a save dialog (default Documents), then opens it in the PDF viewer.
 - Pomodoro limits live in `core/pomodoro.LIMITS` (Focus 180, Short 60, Long 120); UI uses the same.

@@ -334,28 +334,53 @@ Item {
         }
     }
 
-    // Task finished: offer the next one; never auto-advance.
+    // Task finished: a full-screen moment with this task's ring, every segment green, then
+    // the choice of what's next. Never auto-advances.
     Rectangle {
-        anchors.centerIn: parent
-        width: parent.width - 2 * Theme.s6
-        height: finCol.implicitHeight + 2 * Theme.s5
-        radius: 12
+        anchors.fill: parent
         visible: screen.finished
-        color: Theme.dark ? "#2b2b2b" : "#ffffff"
-        border.color: Theme.cardBorder
+        color: Theme.windowColor
+        // Swallow clicks so nothing underneath reacts.
+        MouseArea { anchors.fill: parent; hoverEnabled: true }
+
         ColumnLayout {
-            id: finCol
-            anchors.fill: parent
-            anchors.margins: Theme.s5
+            anchors.centerIn: parent
+            width: Math.min(parent.width - 2 * Theme.s6, 420)
             spacing: Theme.s3
+
+            StepRing {
+                Layout.alignment: Qt.AlignHCenter
+                implicitWidth: 88; implicitHeight: 88
+                lineWidth: 7
+                total: Math.max(1, screen.info.stepTotal || 0)    // a task without steps: one full ring
+                done: Math.max(1, screen.info.stepTotal || 0)
+            }
             Label {
                 Layout.alignment: Qt.AlignHCenter
-                text: "Task done"
-                font.pixelSize: Theme.fontTitle
+                Layout.topMargin: Theme.s2
+                text: "Task complete"
+                font.pixelSize: Theme.fontHero
                 font.weight: Font.DemiBold
             }
+            Label {
+                Layout.fillWidth: true
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.Wrap
+                text: screen.info.title || ""
+                color: Theme.subtext
+            }
+            Label {
+                Layout.alignment: Qt.AlignHCenter
+                visible: (screen.info.stepTotal || 0) > 0
+                text: "All " + Theme.plural(screen.info.stepTotal || 0, "step") + " done"
+                color: Theme.success
+                font.pixelSize: Theme.fontSmall
+                font.weight: Font.DemiBold
+            }
+            Item { implicitHeight: Theme.s3 }
             Button {
                 Layout.fillWidth: true
+                Layout.preferredHeight: 48
                 visible: screen.nextId !== ""
                 highlighted: true
                 text: "Next up: " + (screen.nextId ? (backend.revision, backend.taskInfo(screen.nextId).title) : "")
@@ -367,7 +392,9 @@ Item {
             }
             Button {
                 Layout.fillWidth: true
+                Layout.preferredHeight: screen.nextId !== "" ? -1 : 48
                 text: "Back to My Day"
+                highlighted: screen.nextId === ""
                 flat: screen.nextId !== ""
                 onClicked: appWindow.go("myday")
             }

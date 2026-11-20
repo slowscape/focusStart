@@ -6,8 +6,8 @@ Developer-only: needs fontTools (requirements-dev.txt), not needed to run the ap
 1. Download from https://github.com/microsoft/fluentui-system-icons/tree/main/fonts :
    FluentSystemIcons-Regular.ttf and FluentSystemIcons-Regular.json (name -> code map).
 2. python tools/subset_icons.py <folder with those two files>
-3. It writes app/assets/fonts/StepTaskIcons.ttf and prints the glyph table for
-   app/qml/theme/Theme.qml (paste it over the `glyphs` block if you add icons).
+3. It writes app/assets/fonts/StepTaskIcons.ttf and prints the glyph table (character and
+   ink centre) for app/qml/theme/Theme.qml: paste it over the `glyphs` block.
 
 To add an icon: find its name at https://github.com/microsoft/fluentui-system-icons
 (e.g. "arrow_left"), add it to ICONS below, rerun, and use the key in QML (Icon { name: ... }).
@@ -58,8 +58,20 @@ def main(src: Path) -> None:
     OUT.parent.mkdir(parents=True, exist_ok=True)
     font.save(OUT)
     print(f"wrote {OUT.relative_to(ROOT)} ({OUT.stat().st_size} bytes)\n")
+    # Each icon's ink centre (x from the left, y up from the baseline) as a fraction of the em,
+    # read from the outlines. Icon.qml centres that point: Qt's text metrics misreport this font,
+    # and some Fluent glyphs sit off-centre in their em square on purpose.
+    built = TTFont(OUT)
+    upm = built["head"].unitsPerEm
+    glyf, cmap = built["glyf"], built.getBestCmap()
     print("    readonly property var glyphs: ({")
-    rows = [f'        "{k}":{" " * (9 - len(k))}"\\u{v:04X}"' for k, v in table.items()]
+    rows = []
+    for key, code in table.items():
+        g = glyf[cmap[code]]
+        g.recalcBounds(glyf)
+        cx = (g.xMin + g.xMax) / 2 / upm
+        cy = (g.yMin + g.yMax) / 2 / upm
+        rows.append(f'        "{key}":{" " * (9 - len(key))}["\\u{code:04X}", {cx:.3f}, {cy:.3f}]')
     print(",\n".join(rows))
     print("    })")
 
