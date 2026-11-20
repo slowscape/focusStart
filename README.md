@@ -20,6 +20,16 @@ launch.bat --data-dir "D:\OneDrive\StepTask"
 If setup ever breaks, delete the `.venv` folder and run `launch.bat` again.
 Editing `requirements.txt` also triggers a reinstall on the next launch.
 
+## Run (macOS / Linux, experimental)
+Needs Python 3.10+ (macOS: python.org installer; Linux: `python3` and `python3-venv`).
+
+- macOS: double-click `launch.command` (the first time: right-click > Open to allow it).
+- Linux, or a Mac terminal: `./launch.sh`
+
+The first run creates `.venv` and installs PySide6, like on Windows. Data lives in
+`~/Library/Application Support/StepTask` (macOS) or `~/.local/share/StepTask` (Linux);
+`--data-dir` works the same. On some Linux systems Qt also needs `libxcb-cursor0`.
+
 ## Tips
 - **Quick-add `/list`:** type `/` to pick a list (matching ignores case). Up/Down + Enter or Tab picks;
   a name that doesn't exist yet becomes a new list, spelled exactly as typed. The list chip
@@ -53,6 +63,8 @@ Style override for troubleshooting: `--style Material` (or `Basic`), or set
 
 Regenerate assets (stdlib only): `python tools/generate_sounds.py`,
 `python tools/generate_images.py`.
+Icons are a trimmed copy of Microsoft's Fluent UI System Icons (MIT, licence in
+`app/assets/fonts/`); rebuild with `tools/subset_icons.py` (needs `fonttools`, see its header).
 
 ## Layout
 - `app/core/`: pure Python, no Qt (models, store, service, dates, progress, history, pomodoro, printout, phrases). Unit-tested.

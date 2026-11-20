@@ -204,13 +204,15 @@ Item {
                 wrapMode: Text.Wrap
                 color: Theme.subtext
                 font.pixelSize: Theme.fontSmall
-                text: "To keep data elsewhere (for example a OneDrive folder), start with:\nlaunch.bat --data-dir \"D:\\path\\to\\folder\""
+                text: Qt.platform.os === "windows"
+                      ? "To keep data elsewhere (for example a OneDrive folder), start with:\nlaunch.bat --data-dir \"D:\\path\\to\\folder\""
+                      : "To keep data elsewhere (for example a synced folder), start with:\n./launch.sh --data-dir \"$HOME/path/to/folder\""
             }
             Label {
                 Layout.topMargin: Theme.s4
                 color: Theme.subtext
                 font.pixelSize: Theme.fontSmall
-                text: "Shortcuts: Ctrl+N new task \u00B7 Esc back \u00B7 Space/Enter step complete (Focus) \u00B7 \u2192 skip step"
+                text: "Shortcuts: " + (Qt.platform.os === "osx" ? "\u2318N" : "Ctrl+N") + " new task \u00B7 Esc back \u00B7 Space/Enter step complete (Focus) \u00B7 \u2192 skip step"
                 wrapMode: Text.Wrap
                 Layout.fillWidth: true
             }

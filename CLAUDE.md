@@ -1,11 +1,12 @@
 # StepTask (formerly FocusStart): notes for Claude Code
 
-Local-only Windows to-do app for ADHD task initiation. Python 3.12 + PySide6 (QML, FluentWinUI3 style).
+Local-only to-do app for ADHD task initiation (Windows; macOS/Linux experimental on branch
+`mac-fluent-icons`). Python 3.12 + PySide6 (QML, FluentWinUI3 style).
 `SPEC.md` is the original brief. Where this file and SPEC.md disagree, this file wins:
 the owner changed several things after trying the app (listed under "Decisions").
 
 ## Run and test
-- Run: `launch.bat` (creates `.venv`, installs `requirements.txt`, starts `pythonw -m app`).
+- Run: `launch.bat` on Windows, `launch.sh` / `launch.command` (double-click) on macOS/Linux (creates `.venv`, installs `requirements.txt`, starts `pythonw -m app`).
   With a console and logs: `.venv\Scripts\python -m app`. Data: `%APPDATA%\StepTask\` (`app.log` there;
   a legacy `%APPDATA%\FocusStart` folder is renamed to it on first run, see `main.default_data_dir`).
 - Tests (core only, no Qt): `.venv\Scripts\python -m pip install -r requirements-dev.txt`, then `.venv\Scripts\python -m pytest`.
@@ -64,6 +65,12 @@ the owner changed several things after trying the app (listed under "Decisions")
   can size from the first layout and clip notes on the right until the window is resized.
 - Empty states bind to the *model's* `count` (e.g. `backend.myDayModel.count`): it changes at once,
   while the ListView's count waits for the delayRemove fade-outs to finish.
+- Icons: bundled `app/assets/fonts/StepTaskIcons.ttf` (Fluent UI System Icons, MIT, 20 px regular),
+  only the glyphs in `tools/subset_icons.py` ICONS. Adding an icon = add it there, rerun the tool,
+  paste the printed table into `Theme.glyphs`. Don't rely on Windows' Segoe Fluent Icons.
+- `launch.sh`/`launch.command` must keep LF line endings (`.gitattributes`) and the git executable bit.
+- `main.pick_style` falls back to Fusion if this PySide6 build lacks FluentWinUI3, so the window still
+  opens. Data folder per OS in `main.data_base_dir` (macOS Application Support, Linux XDG).
 - Esc: Main's Esc shortcut is enabled only off tab screens, so screen-level Esc shortcuts never clash
   (two enabled shortcuts with the same key both stop working).
 

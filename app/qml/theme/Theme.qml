@@ -43,42 +43,37 @@ QtObject {
     readonly property int fontTitle: 20
     readonly property int fontHero: 26
 
-    // Icons: Segoe Fluent Icons ships with Windows 11; fall back to Unicode elsewhere.
-    readonly property bool fluentIcons: Qt.fontFamilies().indexOf("Segoe Fluent Icons") >= 0
-    readonly property string iconFont: fluentIcons ? "Segoe Fluent Icons" : ""
+    // Icons: Microsoft's Fluent UI System Icons (MIT), bundled as a small font holding only the
+    // icons we use (app/assets/fonts/StepTaskIcons.ttf, built by tools/subset_icons.py), so they
+    // look the same on Windows 10/11, macOS and Linux. Codes below are printed by that tool.
+    readonly property FontLoader iconLoader: FontLoader { source: "../../assets/fonts/StepTaskIcons.ttf" }
+    readonly property string iconFont: iconLoader.name
+    readonly property bool fluentIcons: iconLoader.status === FontLoader.Ready
     readonly property var glyphs: ({
-        "back":     ["", "←"],
-        "play":     ["", "▶"],
-        "more":     ["", "⋯"],
-        "settings": ["", "⚙"],
-        "add":      ["", "+"],
-        "sun":      ["", "☀"],
-        "calendar": ["", "\u{1F4C5}"],
-        "delete":   ["", "✕"],
-        "up":       ["", "↑"],
-        "down":     ["", "↓"],
-        "close":    ["", "✕"],
-        "edit":     ["", "✎"],
-        "check":    ["", "✓"],
-        "skip":     ["", "↷"],
-        "next":     ["", "→"],
-        "chevron":  ["", "▾"],
-        "chevronR": ["", "▸"],
-        "folder":   ["", "\u{1F4C2}"],
-        "list":     ["", "☰"],
-        "restore":  ["", "↺"],
-        "menu":     ["\uE700", "\u2630"],
-        "pause":    ["\uE769", "\u275A\u275A"],
-        "power":    ["\uE7E8", "\u23FB"],
-        "stop":     ["\uE71A", "\u25A0"],
-        "timer":    ["\uE916", "\u23F1"],
-        "grip":     ["\uE76F", "\u2261"],
-        "print":    ["\uE749", "\u2399"]
+        "back":     "\uF15B",
+        "next":     "\uF181",
+        "play":     "\uF605",
+        "pause":    "\uF5A1",
+        "stop":     "\uF72A",
+        "timer":    "\uED88",
+        "more":     "\uE824",
+        "settings": "\uF6A9",
+        "print":    "\uF62A",
+        "add":      "\uF109",
+        "list":     "\uF4ED",
+        "menu":     "\uF560",
+        "sun":      "\uF8A1",
+        "calendar": "\uE24E",
+        "check":    "\uF294",
+        "chevron":  "\uF2A3",
+        "chevronR": "\uF2B0",
+        "close":    "\uF369",
+        "delete":   "\uF34C",
+        "edit":     "\uF3DD",
+        "grip":     "\uE9F8"
     })
     function glyph(name) {
-        var g = glyphs[name]
-        if (!g) return "?"
-        return fluentIcons ? g[0] : g[1]
+        return glyphs[name] || "?"
     }
 
     function plural(n, word) { return n + " " + word + (n === 1 ? "" : "s") }

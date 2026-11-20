@@ -6,7 +6,7 @@ them, and rows never split across pages.
 from __future__ import annotations
 
 from PySide6.QtCore import QLocale, QMarginsF, QRectF, Qt
-from PySide6.QtGui import (QColor, QFont, QFontMetricsF, QPageLayout, QPageSize, QPainter,
+from PySide6.QtGui import (QColor, QFont, QFontDatabase, QFontMetricsF, QPageLayout, QPageSize, QPainter,
                            QPdfWriter, QPen)
 
 from ..core.printout import BODY_PT, HEADING_PT, SUB_PT, PrintTask
@@ -28,7 +28,7 @@ def write_pdf(path: str, heading: str, subheading: str, tasks: list[PrintTask]) 
     width, height = writer.width(), writer.height()
 
     def font(size, weight=QFont.Weight.Normal):
-        f = QFont("Segoe UI")
+        f = QFont(QFontDatabase.systemFont(QFontDatabase.SystemFont.GeneralFont).family())
         f.setPointSizeF(size)
         f.setWeight(weight)
         return f

@@ -17,9 +17,20 @@ ROOT = Path(__file__).resolve().parent
 log = logging.getLogger("steptask")
 
 
+LAUNCHER = "launch.bat" if sys.platform == "win32" else "launch.sh"
+
+
+def data_base_dir() -> Path:
+    """Where per-user app data lives on this system."""
+    if sys.platform == "win32" or os.environ.get("APPDATA"):
+        return Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming")
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support"
+    return Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share")
+
+
 def default_data_dir() -> Path:
-    appdata = os.environ.get("APPDATA")
-    base = Path(appdata) if appdata else Path.home() / ".local" / "share"
+    base = data_base_dir()
     new = base / APP_NAME
     if not new.exists():
         # The app used to be called FocusStart: move its data folder (tasks, backups) over.
@@ -38,7 +49,8 @@ def default_data_dir() -> Path:
 def parse_args(argv):
     p = argparse.ArgumentParser(prog=APP_NAME)
     p.add_argument("--data-dir", type=Path, default=None,
-                   help=r"Data folder (default: %%APPDATA%%\StepTask)")
+                   help="Data folder (default: %%APPDATA%%\\StepTask on Windows, "
+                        "~/Library/Application Support/StepTask on macOS, ~/.local/share/StepTask on Linux)")
     p.add_argument("--style", default=os.environ.get("FOCUSSTART_STYLE", "FluentWinUI3"),
                    help="Qt Quick Controls style (FluentWinUI3, Material, Basic)")
     args, _unknown = p.parse_known_args(argv)  # tolerate Qt's own flags
@@ -63,6 +75,15 @@ def setup_logging(data_dir: Path) -> None:
 
 def message_box(text: str, title: str = APP_NAME) -> None:
     """Show an error without Qt (it may be the thing that's missing)."""
+    if sys.platform == "darwin":
+        try:
+            import subprocess
+            esc = lambda s: s.replace("\\", "\\\\").replace('"', '\\"')
+            subprocess.run(["osascript", "-e", f'display dialog "{esc(text)}" with title "{esc(title)}" '
+                            'buttons {"OK"} default button 1'], check=False, timeout=600)
+            return
+        except Exception:  # noqa: BLE001
+            pass
     if sys.platform == "win32":
         try:
             import ctypes
@@ -92,6 +113,20 @@ def allow_foreground_for_others() -> None:
             pass
 
 
+def pick_style(wanted: str) -> str:
+    """The Fluent look everywhere when this PySide6 build has it; Fusion (Qt's neutral style)
+    otherwise, so a missing style can't stop the app from opening."""
+    try:
+        import PySide6
+        styles = Path(PySide6.__file__).parent / "qml" / "QtQuick" / "Controls"
+        if (styles / wanted).is_dir() or not styles.is_dir():
+            return wanted
+        log.warning("style %s not available here; using Fusion", wanted)
+        return "Fusion"
+    except Exception:  # noqa: BLE001
+        return wanted
+
+
 def run(argv=None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
     data_dir = (args.data_dir or default_data_dir()).expanduser().resolve()
@@ -112,7 +147,7 @@ def run(argv=None) -> int:
     except ImportError as e:
         log.exception("PySide6 import failed")
         message_box("StepTask couldn't start because PySide6 isn't installed correctly.\n\n"
-                    "Delete the .venv folder next to launch.bat and run launch.bat again.\n\n"
+                    f"Delete the .venv folder next to {LAUNCHER} and run {LAUNCHER} again.\n\n"
                     f"Details: {e}")
         return 1
     log.info("PySide6 %s", pyside_version)
@@ -125,8 +160,9 @@ def run(argv=None) -> int:
 
     set_app_user_model_id()
     QGuiApplication.setApplicationName(APP_NAME)
+    QGuiApplication.setApplicationDisplayName(APP_NAME)   # macOS menu bar / Linux docks
     QGuiApplication.setOrganizationName(APP_NAME)
-    QQuickStyle.setStyle(args.style)
+    QQuickStyle.setStyle(pick_style(args.style))
     app = QGuiApplication(sys.argv[:1])
     app.setWindowIcon(QIcon(str(ROOT / "assets" / "images" / "icon.png")))
 
