@@ -26,11 +26,21 @@ Rectangle {
         width: Math.min(parent.width - 2 * Theme.s6, 420)
         spacing: Theme.s3
 
+        // This task's own progress: one segment per step, green = done.
         StepRing {
             Layout.alignment: Qt.AlignHCenter
+            visible: (ov.info.stepTotal || 0) > 0
             implicitWidth: 56; implicitHeight: 56
             lineWidth: 5
-            total: 3; done: 3
+            total: ov.info.stepTotal || 0
+            done: ov.info.stepDone || 0
+        }
+        Label {
+            Layout.alignment: Qt.AlignHCenter
+            visible: (ov.info.stepTotal || 0) > 0
+            text: (ov.info.stepDone || 0) + " of " + Theme.plural(ov.info.stepTotal || 0, "step") + " done"
+            color: Theme.subtext
+            font.pixelSize: Theme.fontSmall
         }
         Label {
             Layout.alignment: Qt.AlignHCenter

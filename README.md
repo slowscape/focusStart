@@ -1,4 +1,7 @@
-# FocusStart
+# StepTask
+
+(Formerly FocusStart. On first run the old `%APPDATA%\FocusStart` data folder is moved to
+`%APPDATA%\StepTask`.)
 
 A small, local-only Windows to-do app built around task initiation: add a task, spend
 2 minutes listing tiny steps, then work through them one at a time. See `SPEC.md`.
@@ -7,11 +10,11 @@ A small, local-only Windows to-do app built around task initiation: add a task, 
 Double-click `launch.bat`. The first run creates `.venv` and installs PySide6
 (~115 MB download, a console window shows progress). Later runs start silently.
 
-Data lives in `%APPDATA%\FocusStart\` (`data.json`, `backups\`, `app.log`).
+Data lives in `%APPDATA%\StepTask\` (`data.json`, `backups\`, `app.log`).
 Use another folder (for example OneDrive):
 
 ```bat
-launch.bat --data-dir "D:\OneDrive\FocusStart"
+launch.bat --data-dir "D:\OneDrive\StepTask"
 ```
 
 If setup ever breaks, delete the `.venv` folder and run `launch.bat` again.
@@ -33,6 +36,9 @@ Editing `requirements.txt` also triggers a reinstall on the next launch.
   another day's tasks to move it to that day.
 - **Repeat:** Edit task > Repeat. When you finish it, the next copy is planned automatically.
 - **Background:** Settings > Background, pick a folder of pictures.
+- **Notes:** start a line with `- ` or `* ` for bullets; Enter continues them, Enter on an empty
+  bullet ends the list.
+- **Light/dark:** Settings > Appearance (System, Light or Dark).
 - **Print:** the printer icon on My Day, or a list's "..." menu, saves a checklist PDF and opens it.
 - **Focus:** click any grey segment in the step bar to work on that step next.
 

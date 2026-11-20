@@ -14,7 +14,7 @@ ApplicationWindow {
     minimumWidth: 320
     minimumHeight: 480
     visible: false            // Python restores geometry, then shows
-    title: "FocusStart"
+    title: "StepTask"
     color: Theme.windowColor
 
     // ---------------------------------------------------------------- theme
@@ -24,6 +24,11 @@ ApplicationWindow {
     Binding { target: Theme; property: "effects"; value: backend.effects }
 
     // ----------------------------------------------------------- navigation
+    // Room for the four tabs: window width minus the row's margins (12), the gear (36) and the
+    // Fluent TabBar's own padding (4 + 4). If the tabs add up to more, the bar scrolls a few px
+    // depending on the selected tab, and the tabs shift when switching. From appWindow.width
+    // (not the TabBar's width) to avoid a binding loop.
+    readonly property real tabSpace: width - 12 - 36 - 8 - 4
     readonly property var tabs: ["myday", "upcoming", "lists", "history"]
     property string lastFocusTaskId: ""
     property string screen: "myday"
@@ -187,10 +192,10 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 background: Item {}
                 currentIndex: appWindow.tabs.indexOf(appWindow.screen)
-                TabButton { focusPolicy: Qt.NoFocus; text: "My Day"; width: (appWindow.width - 52) * 0.24; leftPadding: 2; rightPadding: 2; onClicked: appWindow.go("myday") }
-                TabButton { focusPolicy: Qt.NoFocus; text: "Upcoming"; width: (appWindow.width - 52) * 0.3; leftPadding: 2; rightPadding: 2; onClicked: appWindow.go("upcoming") }
-                TabButton { focusPolicy: Qt.NoFocus; text: "Lists"; width: (appWindow.width - 52) * 0.2; leftPadding: 2; rightPadding: 2; onClicked: appWindow.go("lists") }
-                TabButton { focusPolicy: Qt.NoFocus; text: "History"; width: (appWindow.width - 52) * 0.26; leftPadding: 2; rightPadding: 2; onClicked: appWindow.go("history") }
+                TabButton { focusPolicy: Qt.NoFocus; text: "My Day"; width: appWindow.tabSpace * 0.24; leftPadding: 2; rightPadding: 2; onClicked: appWindow.go("myday") }
+                TabButton { focusPolicy: Qt.NoFocus; text: "Upcoming"; width: appWindow.tabSpace * 0.3; leftPadding: 2; rightPadding: 2; onClicked: appWindow.go("upcoming") }
+                TabButton { focusPolicy: Qt.NoFocus; text: "Lists"; width: appWindow.tabSpace * 0.2; leftPadding: 2; rightPadding: 2; onClicked: appWindow.go("lists") }
+                TabButton { focusPolicy: Qt.NoFocus; text: "History"; width: appWindow.tabSpace * 0.26; leftPadding: 2; rightPadding: 2; onClicked: appWindow.go("history") }
             }
             IconButton {
                 icon_: "settings"; tip: "Settings"

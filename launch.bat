@@ -8,7 +8,7 @@ if exist "%VENV%\Scripts\pythonw.exe" (
   fc /b requirements.txt "%VENV%\.installed" >nul 2>nul && goto run
 )
 
-echo FocusStart: first-time setup. This takes a minute or two...
+echo StepTask: first-time setup. This takes a minute or two...
 echo.
 
 set "PY="

@@ -1,4 +1,4 @@
-# FocusStart: notes for Claude Code
+# StepTask (formerly FocusStart): notes for Claude Code
 
 Local-only Windows to-do app for ADHD task initiation. Python 3.12 + PySide6 (QML, FluentWinUI3 style).
 `SPEC.md` is the original brief. Where this file and SPEC.md disagree, this file wins:
@@ -6,7 +6,8 @@ the owner changed several things after trying the app (listed under "Decisions")
 
 ## Run and test
 - Run: `launch.bat` (creates `.venv`, installs `requirements.txt`, starts `pythonw -m app`).
-  With a console and logs: `.venv\Scripts\python -m app`. Data: `%APPDATA%\FocusStart\` (`app.log` there).
+  With a console and logs: `.venv\Scripts\python -m app`. Data: `%APPDATA%\StepTask\` (`app.log` there;
+  a legacy `%APPDATA%\FocusStart` folder is renamed to it on first run, see `main.default_data_dir`).
 - Tests (core only, no Qt): `.venv\Scripts\python -m pip install -r requirements-dev.txt`, then `.venv\Scripts\python -m pytest`.
 - After any QML change, run the app and check `app.log` for QML warnings (binding loops, null refs).
 - Scripted screenshots: set `QSG_RENDER_LOOP=basic`. With the default threaded loop, animations don't
@@ -42,6 +43,8 @@ the owner changed several things after trying the app (listed under "Decisions")
 - FluentWinUI3 adds its own Popup padding/insets. Set them all explicitly or content gets squeezed.
 - Fluent `TextArea`/`TabButton` have style minimum sizes. `StepInput` overrides `implicitHeight`; tab
   widths derive from `appWindow.width` (deriving them from the TabBar caused a binding loop).
+  The four tab widths must sum to <= the TabBar's availableWidth (`appWindow.tabSpace` subtracts its
+  4+4 px padding); otherwise the bar scrolls a few px per selected tab and the tabs shift on switch.
 - Avoid `Drawer`, `StackView`, `SplitView`, `SwipeView` (Fluent falls back to Fusion). The Lists side
   panel is a custom slide-out.
 - Text fields must not save only on blur: `IconButton` is TabFocus and Done/Skip are NoFocus, so
@@ -59,10 +62,8 @@ the owner changed several things after trying the app (listed under "Decisions")
   the given tasks already hold, so other views keep their order.
 - `NotesArea` pins its TextArea to `availableWidth` (contentWidth too): otherwise the ScrollView
   can size from the first layout and clip notes on the right until the window is resized.
-- Empty states bind to the *model's* `count` (e.g. `backend.myDayModel.count`), not the ListView's:
-  with delayRemove fade-outs the ListView's count isn't re-announced when the last card goes.
-- Don't bind `visible: opacity > 0` together with a `Behavior on opacity`: the hidden item's Behavior
-  never starts, so it stays at 0. `BackgroundPicture` fades its two images, not itself.
+- Empty states bind to the *model's* `count` (e.g. `backend.myDayModel.count`): it changes at once,
+  while the ListView's count waits for the delayRemove fade-outs to finish.
 - Esc: Main's Esc shortcut is enabled only off tab screens, so screen-level Esc shortcuts never clash
   (two enabled shortcuts with the same key both stop working).
 
@@ -130,6 +131,15 @@ the owner changed several things after trying the app (listed under "Decisions")
 - Print: My Day header print icon, Lists "..." menu. Saves a checklist PDF (18 pt, empty checkbox per
   task and remaining step) via a save dialog (default Documents), then opens it in the PDF viewer.
 - Pomodoro limits live in `core/pomodoro.LIMITS` (Focus 180, Short 60, Long 120); UI uses the same.
+- Renamed FocusStart -> **StepTask** (window title, messages, PDF). The GitHub repo/folder keep the old
+  name. `main.default_data_dir` renames a legacy `FocusStart` data folder on first run (falls back to it
+  if the rename fails, e.g. the old app is open).
+- Break-over prompt shows the task's own step ring and "N of M steps done" (none for step-less tasks).
+- Notes auto-bullets: a line starting "- " or "* " (any indent) continues on Enter; Enter on an empty
+  bullet ends the list; Shift+Enter is a plain newline (`NotesArea` Keys.onPressed).
+- Undo toast: 3 s (paused on hover); clicking it dismisses it; Undo still works.
+- Settings > Appearance: System / Light / Dark (`settings.appearance`), applied via
+  `QStyleHints.setColorScheme` (Qt 6.8+); the Fluent style and palette follow live.
 - Positive-only guardrails from SPEC.md section 9 still apply (no streaks, overdue, red, guilt copy).
 
 ## Open issue

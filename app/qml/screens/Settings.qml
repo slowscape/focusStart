@@ -22,7 +22,15 @@ Item {
 
             Label { text: "Settings"; font.pixelSize: Theme.fontHero; font.weight: Font.DemiBold; Layout.topMargin: Theme.s2; Layout.bottomMargin: Theme.s2 }
 
-            Label { text: "Sound"; font.weight: Font.DemiBold }
+            Label { text: "Appearance"; font.weight: Font.DemiBold }
+            ButtonGroup { id: appearanceGroup }
+            RowLayout {
+                RadioButton { text: "System"; ButtonGroup.group: appearanceGroup; checked: backend.appearance === "system"; onClicked: backend.appearance = "system" }
+                RadioButton { text: "Light"; ButtonGroup.group: appearanceGroup; checked: backend.appearance === "light"; onClicked: backend.appearance = "light" }
+                RadioButton { text: "Dark"; ButtonGroup.group: appearanceGroup; checked: backend.appearance === "dark"; onClicked: backend.appearance = "dark" }
+            }
+
+            Label { text: "Sound"; font.weight: Font.DemiBold; Layout.topMargin: Theme.s3 }
             Switch {
                 text: backend.sound ? "On" : "Off"
                 checked: backend.sound

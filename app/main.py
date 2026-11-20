@@ -10,23 +10,35 @@ import sys
 import traceback
 from pathlib import Path
 
-APP_NAME = "FocusStart"
-APP_ID = "FocusStart.App.1"  # Windows AppUserModelID
+APP_NAME = "StepTask"
+APP_ID = "StepTask.App.1"  # Windows AppUserModelID
+OLD_NAMES = ("FocusStart",)  # earlier names: their data folder is moved over on first run
 ROOT = Path(__file__).resolve().parent
-log = logging.getLogger("focusstart")
+log = logging.getLogger("steptask")
 
 
 def default_data_dir() -> Path:
     appdata = os.environ.get("APPDATA")
-    if appdata:
-        return Path(appdata) / APP_NAME
-    return Path.home() / ".local" / "share" / APP_NAME
+    base = Path(appdata) if appdata else Path.home() / ".local" / "share"
+    new = base / APP_NAME
+    if not new.exists():
+        # The app used to be called FocusStart: move its data folder (tasks, backups) over.
+        # If that fails (e.g. the old app is still open), keep using the old folder.
+        for old_name in OLD_NAMES:
+            old = base / old_name
+            if old.is_dir():
+                try:
+                    old.rename(new)
+                except OSError:
+                    return old
+                break
+    return new
 
 
 def parse_args(argv):
     p = argparse.ArgumentParser(prog=APP_NAME)
     p.add_argument("--data-dir", type=Path, default=None,
-                   help=r"Data folder (default: %%APPDATA%%\FocusStart)")
+                   help=r"Data folder (default: %%APPDATA%%\StepTask)")
     p.add_argument("--style", default=os.environ.get("FOCUSSTART_STYLE", "FluentWinUI3"),
                    help="Qt Quick Controls style (FluentWinUI3, Material, Basic)")
     args, _unknown = p.parse_known_args(argv)  # tolerate Qt's own flags
@@ -99,7 +111,7 @@ def run(argv=None) -> int:
         from PySide6.QtQuickControls2 import QQuickStyle
     except ImportError as e:
         log.exception("PySide6 import failed")
-        message_box("FocusStart couldn't start because PySide6 isn't installed correctly.\n\n"
+        message_box("StepTask couldn't start because PySide6 isn't installed correctly.\n\n"
                     "Delete the .venv folder next to launch.bat and run launch.bat again.\n\n"
                     f"Details: {e}")
         return 1
@@ -144,7 +156,7 @@ def run(argv=None) -> int:
         loaded = store.load()
     except SchemaTooNewError as e:
         log.error("%s", e)
-        message_box("This data file was saved by a newer version of FocusStart, so this "
+        message_box("This data file was saved by a newer version of StepTask, so this "
                     "version won't open it (to avoid overwriting anything).\n\n"
                     f"{data_dir}\\data.json")
         return 1
@@ -163,7 +175,7 @@ def run(argv=None) -> int:
     engine.load(QUrl.fromLocalFile(str(ROOT / "qml" / "Main.qml")))
     if not engine.rootObjects():
         log.error("QML failed to load")
-        message_box("FocusStart couldn't load its interface. Details are in app.log in:\n"
+        message_box("StepTask couldn't load its interface. Details are in app.log in:\n"
                     f"{data_dir}")
         return 1
     window = engine.rootObjects()[0]

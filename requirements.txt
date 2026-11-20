@@ -1,5 +1,5 @@
 # Only the two PySide6 wheels this app uses (the "PySide6" meta-package also pulls in
-# WebEngine and Pdf, ~135 MB, which FocusStart never imports).
+# WebEngine and Pdf, ~135 MB, which StepTask never imports).
 #
 # Kept below 6.10: from 6.10 on, Qt6Core.dll links to Windows' own icuuc.dll
 # (ucnv_open etc.). On PCs where that system file is only a stub or an incomplete

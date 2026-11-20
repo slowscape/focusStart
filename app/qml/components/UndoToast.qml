@@ -3,7 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import "../theme"
 
-// Completion toast with Undo, ~5 s.
+// Completion toast with Undo, ~3 s (paused while hovered). Click it to dismiss now.
 Rectangle {
     id: toast
     property string message: ""
@@ -29,7 +29,8 @@ Rectangle {
     Behavior on opacity { NumberAnimation { duration: Theme.durMed } }
     Behavior on y { NumberAnimation { duration: Theme.durMed; easing.type: Easing.OutCubic } }
 
-    Timer { id: timer; interval: 5000; onTriggered: toast.open = false }
+    Timer { id: timer; interval: 3000; onTriggered: toast.open = false }
+    TapHandler { onTapped: toast.hide() }      // the Undo button still takes its own clicks
     HoverHandler { onHoveredChanged: if (hovered) timer.stop(); else if (toast.open) timer.restart() }
 
     RowLayout {

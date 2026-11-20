@@ -67,5 +67,22 @@ ScrollView {
         onTextChanged: if (!root._loading) { root._dirty = true; saveTimer.restart() }
         onActiveFocusChanged: if (!activeFocus) root.save()
         Keys.onEscapePressed: { root.save(); root.escaped() }
+        // Bullets: on a line starting "- " or "* " (any indent), Enter starts the next line
+        // with the same marker; Enter on an empty bullet ends the list. Shift+Enter: plain line.
+        Keys.onPressed: (e) => {
+            if ((e.key !== Qt.Key_Return && e.key !== Qt.Key_Enter) || (e.modifiers & Qt.ShiftModifier)) return
+            if (area.selectedText !== "") return
+            var pos = area.cursorPosition
+            var start = area.text.lastIndexOf("\n", pos - 1) + 1
+            var line = area.text.substring(start, pos)
+            var m = line.match(/^(\s*)([-*]) (.*)$/)
+            if (!m) return
+            e.accepted = true
+            if (m[3].trim() === "" && area.text.substring(pos, pos + 1).match(/^(\n|)$/)) {
+                area.remove(start, pos)               // empty bullet: end the list here
+                return
+            }
+            area.insert(pos, "\n" + m[1] + m[2] + " ")
+        }
     }
 }

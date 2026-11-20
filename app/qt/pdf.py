@@ -22,7 +22,7 @@ def write_pdf(path: str, heading: str, subheading: str, tasks: list[PrintTask]) 
     writer.setPageMargins(QMarginsF(18, 16, 18, 16), QPageLayout.Unit.Millimeter)
     writer.setResolution(300)
     writer.setTitle(heading)
-    writer.setCreator("FocusStart")
+    writer.setCreator("StepTask")
 
     pt = writer.resolution() / 72.0          # device pixels per point
     width, height = writer.width(), writer.height()

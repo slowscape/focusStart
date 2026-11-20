@@ -8,3 +8,5 @@ __pycache__/
 data.json
 backups/
 *.pdf
+# Personal background pictures kept next to the app
+backgrounds/

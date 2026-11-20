@@ -14,6 +14,7 @@ from .pomodoro import clean_settings as clean_pomodoro
 
 SCHEMA_VERSION = 1
 EFFECTS = ("full", "calm", "off")
+APPEARANCES = ("system", "light", "dark")
 WEEK_STARTS = ("monday", "sunday")
 
 
@@ -243,6 +244,7 @@ class Settings:
     volume: float = 0.7
     effects: str = "full"
     week_starts: str = "monday"
+    appearance: str = "system"      # light/dark override; "system" follows Windows
     day_progress: dict = field(default_factory=lambda: {"date": None, "floor": 0.0})
     days_completed: list[str] = field(default_factory=list)
     window: dict | None = None
@@ -252,7 +254,7 @@ class Settings:
 
     # Old files may still hold "last_recap_date"/"recap_history" (recap screen removed);
     # like any unknown key they are kept in extra.
-    KEYS = {"sound", "volume", "effects", "week_starts",
+    KEYS = {"sound", "volume", "effects", "week_starts", "appearance",
             "day_progress", "days_completed", "window", "pomodoro", "background"}
 
     @classmethod
@@ -265,6 +267,7 @@ class Settings:
             s.volume = 0.7
         s.effects = d.get("effects") if d.get("effects") in EFFECTS else "full"
         s.week_starts = d.get("week_starts") if d.get("week_starts") in WEEK_STARTS else "monday"
+        s.appearance = d.get("appearance") if d.get("appearance") in APPEARANCES else "system"
         dp = d.get("day_progress")
         if isinstance(dp, dict):
             try:
@@ -285,7 +288,7 @@ class Settings:
     def to_dict(self) -> dict:
         out = dict(self.extra)
         out.update(sound=self.sound, volume=self.volume, effects=self.effects,
-                   week_starts=self.week_starts,
+                   week_starts=self.week_starts, appearance=self.appearance,
                    day_progress=dict(self.day_progress),
                    days_completed=list(self.days_completed), window=self.window,
                    pomodoro=dict(self.pomodoro), background=dict(self.background))

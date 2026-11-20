@@ -7,8 +7,8 @@ import time
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from PySide6.QtCore import Property, QObject, QTimer, QUrl, Signal, Slot
-from PySide6.QtGui import QDesktopServices
+from PySide6.QtCore import Property, QObject, Qt, QTimer, QUrl, Signal, Slot
+from PySide6.QtGui import QDesktopServices, QGuiApplication
 
 from ..core import dates, history, phrases, printout
 from ..core.pomodoro import LIMITS as POMO_LIMITS, Pomodoro, clamp as pomo_clamp
@@ -97,6 +97,7 @@ class Backend(QObject):
         self._tick.start()
 
         self._bg_image = self._compute_bg()
+        self._apply_appearance()
         if first_run:
             self._notice = "Welcome. Add your first task below, then break it into small steps."
             self._schedule_save()
@@ -252,6 +253,29 @@ class Backend(QObject):
             self.svc.set_setting("week_starts", v); self.settingsChanged.emit(); self._mutated()
     weekStarts = Property(str, lambda self: self._s().week_starts, _set_week_starts,
                           notify=settingsChanged)
+
+    # Light/dark: "system" follows Windows; "light"/"dark" override it (Qt 6.8+ style hints;
+    # the Fluent style and the window palette follow, and Theme binds to the palette).
+    def _apply_appearance(self):
+        hints = QGuiApplication.styleHints()
+        mode = self._s().appearance
+        try:
+            if mode == "light":
+                hints.setColorScheme(Qt.ColorScheme.Light)
+            elif mode == "dark":
+                hints.setColorScheme(Qt.ColorScheme.Dark)
+            else:
+                hints.unsetColorScheme()
+        except AttributeError:  # older Qt: no override, the system setting applies
+            log.info("colour scheme override not supported by this Qt")
+
+    def _set_appearance(self, v):
+        if v in ("system", "light", "dark") and v != self._s().appearance:
+            self.svc.set_setting("appearance", v)
+            self._apply_appearance()
+            self.settingsChanged.emit()
+            self._schedule_save()
+    appearance = Property(str, lambda self: self._s().appearance, _set_appearance, notify=settingsChanged)
 
     dataDir = Property(str, lambda self: str(self.store.dir), constant=True)
 

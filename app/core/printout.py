@@ -26,5 +26,5 @@ def from_tasks(tasks: list[Task]) -> list[PrintTask]:
 
 def filename(heading: str, iso_date: str) -> str:
     """'My Day 2026-11-17.pdf'; characters Windows forbids in file names are dropped."""
-    safe = "".join(c for c in heading if c not in '<>:"/\\|?*').strip() or "FocusStart"
+    safe = "".join(c for c in heading if c not in '<>:"/\\|?*').strip() or "StepTask"
     return f"{safe} {iso_date}.pdf"
