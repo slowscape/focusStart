@@ -70,14 +70,16 @@ Rectangle {
         IconButton {
             icon_: backend.pomoRunning && !backend.pomoPaused ? "pause" : "play"
             tip: backend.pomoRunning && !backend.pomoPaused ? "Pause" : (backend.pomoRunning ? "Resume" : "Start")
-            iconSize: 14
+            // Matched by visible height: Fluent's pause bars are 0.8 em tall, play and stop 0.7 em.
+            iconSize: backend.pomoRunning && !backend.pomoPaused ? 14 : 15
             onClicked: backend.pomoTogglePause()
         }
+        // Same visible height and colour as play/pause so the buttons read as one set. (It still
+        // dims, like any disabled button, when there's nothing to stop.)
         IconButton {
             icon_: "stop"
             tip: "Stop and reset"
-            iconSize: 12
-            iconColor: Theme.subtext
+            iconSize: 15
             enabled: backend.pomoRunning
             onClicked: backend.pomoStop()
         }
