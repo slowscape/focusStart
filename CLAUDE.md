@@ -153,6 +153,14 @@ the owner changed several things after trying the app (listed under "Decisions")
 - Undo toast: 3 s (paused on hover); clicking it dismisses it; Undo still works.
 - Settings > Appearance: System / Light / Dark (`settings.appearance`), applied via
   `QStyleHints.setColorScheme` (Qt 6.8+); the Fluent style and palette follow live.
+- First-run welcome notice: never on Settings, and cleared for good once any task exists
+  (`backend._welcome`, `noticeIsWelcome`). Other notices (save errors, backup restored) show everywhere.
+- Settings > Pomodoro > "Display Pomodoro on notch" (`settings.pomodoro.notch`, default off):
+  `PomodoroNotch.qml`, its own frameless always-on-top `Window` at the top centre of the screen while
+  the timer runs. Collapsed: phase left, time right (middle free for the camera notch); hover/click
+  expands (ring, task · step, pause/resume, stop, open; Continue when a break ends). The window is the
+  pill's exact size so it never blocks clicks. macOS: `qt/notch.py` raises the NSWindow above the menu
+  bar and onto every Space via ctypes + the ObjC runtime (no pyobjc); elsewhere it just sits at the top.
 - Positive-only guardrails from SPEC.md section 9 still apply (no streaks, overdue, red, guilt copy).
 
 ## Open issue

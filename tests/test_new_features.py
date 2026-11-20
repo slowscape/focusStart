@@ -62,7 +62,7 @@ def test_pomodoro_stop():
 
 def test_pomodoro_settings_clamped():
     s = clean_settings({"work": 0, "short": "x", "long": 999, "enabled": False})
-    assert s == {"enabled": False, "work": 1, "short": 5, "long": 120, "long_every": 4}
+    assert s == {"enabled": False, "work": 1, "short": 5, "long": 120, "long_every": 4, "notch": False}
 
 
 def test_pomodoro_settings_roundtrip():
@@ -170,3 +170,10 @@ def test_print_filename_is_windows_safe():
     from app.core import printout
     assert printout.filename("My Day", "2026-11-17") == "My Day 2026-11-17.pdf"
     assert printout.filename('Home/Work: "A"?', "2026-11-17") == "HomeWork A 2026-11-17.pdf"
+
+
+def test_pomodoro_notch_setting():
+    assert clean_settings(None)["notch"] is False
+    assert clean_settings({"notch": True})["notch"] is True
+    assert clean_settings({"notch": "yes"})["notch"] is False   # only real booleans count
+    assert clean_settings({"notch": 1})["notch"] is False

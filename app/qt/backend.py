@@ -59,6 +59,7 @@ class Backend(QObject):
         self.store = store
         self.sounds = sounds
         self._notice = notice or ""
+        self._welcome = False            # the notice is the first-run welcome (see _refresh)
         self._first_run = first_run
         self._revision = 0
         self._progress = None
@@ -100,6 +101,7 @@ class Backend(QObject):
         self._apply_appearance()
         if first_run:
             self._notice = "Welcome. Add your first task below, then break it into small steps."
+            self._welcome = True
             self._schedule_save()
         self._refresh()
 
@@ -120,6 +122,7 @@ class Backend(QObject):
     def _set_notice(self, text: str):
         if text != self._notice:
             self._notice = text
+            self._welcome = False        # any other notice (errors, backups) replaces the welcome
             self.noticeChanged.emit()
 
     def _task_item(self, t: Task, section: str = "") -> dict:
@@ -184,10 +187,14 @@ class Backend(QObject):
         for task_id, model in self._done_models.items():
             t = self.svc.task(task_id)
             model.sync([{"id": s.id, "text": s.text} for s in (t.done_steps if t else [])])
+        if self._welcome and self.svc.data.tasks:
+            self._set_notice("")         # the welcome is for an empty app only
         self._history_dirty = True
         self._progress = self.svc.progress()
         self._revision += 1
         self.revisionChanged.emit()
+        if self._pomo.running:
+            self.pomodoroChanged.emit()  # the notch's task/step text may have changed
         self.progressChanged.emit()
 
     def _mutated(self):
@@ -225,6 +232,8 @@ class Backend(QObject):
     def _get_notice(self):
         return self._notice
     notice = Property(str, _get_notice, notify=noticeChanged)
+    # Main.qml hides the welcome (but not error notices) on Settings.
+    noticeIsWelcome = Property(bool, lambda self: self._welcome, notify=noticeChanged)
 
     @Slot()
     def dismissNotice(self):
@@ -791,6 +800,22 @@ class Backend(QObject):
     pomoShort = Property(int, lambda self: self._pomo.short, notify=pomodoroChanged)
     pomoLong = Property(int, lambda self: self._pomo.long, notify=pomodoroChanged)
     # Max minutes per phase, for the SpinBoxes (same limits the settings loader applies).
+    pomoNotch = Property(bool, lambda self: self._pomo_settings()["notch"], notify=pomodoroChanged)
+
+    def _pomo_task_obj(self):
+        return self.svc.task(self._pomo_task or self._focus_task or "")
+
+    def _pomo_task_title(self):
+        t = self._pomo_task_obj()
+        return t.title if t else ""
+
+    def _pomo_step_text(self):
+        t = self._pomo_task_obj()
+        rem = t.remaining_steps if t else []
+        return rem[0].text if rem else ""
+    # For the notch pill: "task · step". Also re-read on every data change (revisionChanged).
+    pomoTaskTitle = Property(str, _pomo_task_title, notify=pomodoroChanged)
+    pomoStepText = Property(str, _pomo_step_text, notify=pomodoroChanged)
     pomoMax = Property("QVariantMap", lambda self: {k: POMO_LIMITS[k][1] for k in ("work", "short", "long")},
                        constant=True)
 
@@ -843,6 +868,22 @@ class Backend(QObject):
             self._pomo.stop()
         self._schedule_save()
         self._pomo_emit()
+
+    @Slot(bool)
+    def pomoSetNotch(self, on: bool):
+        """Settings: show the running timer in a pill at the top of the screen."""
+        self._pomo_settings()["notch"] = bool(on)
+        self._schedule_save()
+        self._pomo_emit()
+
+    @Slot(QObject)
+    def elevateNotch(self, window):
+        """macOS: lift the notch window above the menu bar, on every Space (no-op elsewhere)."""
+        from .notch import elevate
+        try:
+            elevate(int(window.winId()))
+        except Exception:  # noqa: BLE001
+            log.exception("notch elevate failed")
 
     @Slot(str, int)
     def pomoSetMinutes(self, phase: str, minutes: int):

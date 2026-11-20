@@ -234,7 +234,8 @@ ApplicationWindow {
         Rectangle {
             Layout.fillWidth: true
             Layout.margins: Theme.s2
-            visible: backend.notice !== ""
+            // The first-run welcome stays off Settings; other notices (errors) show everywhere.
+            visible: backend.notice !== "" && !(backend.noticeIsWelcome && appWindow.screen === "settings")
             implicitHeight: noticeRow.implicitHeight + Theme.s2 * 2
             radius: Theme.radius
             color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.12)
@@ -315,6 +316,27 @@ ApplicationWindow {
             else backend.pomoTogglePause()
         }
         onEndTask: { backend.pomoStop(); appWindow.go("myday") }
+    }
+
+    // Settings > "Display Pomodoro on notch": the timer as a pill at the top of the screen.
+    PomodoroNotch {
+        function bringBack() {
+            if (appWindow.visibility === Window.Minimized) appWindow.showNormal()
+            appWindow.raise()
+            appWindow.requestActivate()
+        }
+        onOpenRequested: {
+            bringBack()
+            if (appWindow.lastFocusTaskId && backend.taskInfo(appWindow.lastFocusTaskId).exists)
+                appWindow.openFocus(appWindow.lastFocusTaskId, false, true)
+        }
+        onContinueRequested: {
+            bringBack()
+            breakOver.hide()
+            if (appWindow.lastFocusTaskId && backend.taskInfo(appWindow.lastFocusTaskId).exists)
+                appWindow.openFocus(appWindow.lastFocusTaskId)   // Start resumes the waiting session
+            else backend.pomoTogglePause()
+        }
     }
 
     DayCompleteOverlay {
