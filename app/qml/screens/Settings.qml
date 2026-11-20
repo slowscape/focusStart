@@ -69,6 +69,20 @@ Item {
                 text: backend.pomoEnabled ? "Starts when you press a task's Start arrow. You can also turn it off for one task in Edit task."
                                           : "Hidden everywhere."
             }
+            CheckBox {
+                visible: backend.pomoEnabled
+                text: "Display Pomodoro on notch"
+                checked: backend.pomoNotch
+                onToggled: backend.pomoSetNotch(checked)
+            }
+            Label {
+                visible: backend.pomoEnabled
+                Layout.fillWidth: true
+                wrapMode: Text.Wrap
+                color: Theme.subtext
+                font.pixelSize: Theme.fontSmall
+                text: "Shows the timer at the top of the screen while it runs, even when StepTask is in the background."
+            }
 
             // ---------------- tags
             Label { text: "Tags"; font.weight: Font.DemiBold; Layout.topMargin: Theme.s3 }

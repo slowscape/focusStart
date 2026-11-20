@@ -10,7 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 PHASES = ("work", "short", "long")
-DEFAULTS = {"enabled": True, "work": 25, "short": 5, "long": 15, "long_every": 4}
+DEFAULTS = {"enabled": True, "work": 25, "short": 5, "long": 15, "long_every": 4,
+            "notch": False}  # notch: show the running timer in a pill at the top of the screen
 # Allowed range per setting (minutes, or sessions for long_every). The UI uses the same limits.
 LIMITS = {"work": (1, 180), "short": (1, 60), "long": (1, 120), "long_every": (2, 12)}
 
@@ -23,8 +24,9 @@ def clamp(key: str, value: int) -> int:
 def clean_settings(d: dict | None) -> dict:
     out = dict(DEFAULTS)
     if isinstance(d, dict):
-        if isinstance(d.get("enabled"), bool):
-            out["enabled"] = d["enabled"]
+        for key in ("enabled", "notch"):
+            if isinstance(d.get(key), bool):
+                out[key] = d[key]
         for k, (lo, hi) in LIMITS.items():
             try:
                 out[k] = max(lo, min(hi, int(d.get(k, out[k]))))
