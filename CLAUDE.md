@@ -1,7 +1,6 @@
 # StepTask (formerly FocusStart): notes for Claude Code
 
-Local-only to-do app for ADHD task initiation (Windows; macOS/Linux experimental on branch
-`mac-fluent-icons`). Python 3.12 + PySide6 (QML, FluentWinUI3 style).
+Local-only to-do app for ADHD task initiation (Windows and macOS; Linux untested). Python 3.12 + PySide6 (QML, FluentWinUI3 style).
 `SPEC.md` is the original brief. Where this file and SPEC.md disagree, this file wins:
 the owner changed several things after trying the app (listed under "Decisions").
 
