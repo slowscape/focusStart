@@ -330,6 +330,16 @@ ApplicationWindow {
             if (appWindow.lastFocusTaskId && backend.taskInfo(appWindow.lastFocusTaskId).exists)
                 appWindow.openFocus(appWindow.lastFocusTaskId, false, true)
         }
+        // The pill's check: exactly Focus's main button. In Focus on that task, use Focus itself
+        // (so finishing the last step shows the full-screen "Task complete"); elsewhere, complete
+        // the shared current step (or the task when it has no steps) with the usual effects/undo.
+        onCompleteRequested: {
+            var tid = backend.pomoTaskId
+            if (!tid) return
+            if (appWindow.screen === "focus" && loader.item && loader.item.taskId === tid) { loader.item.done(); return }
+            if (backend.pomoStepId) appWindow.completeStep(tid, backend.pomoStepId, null, null)
+            else appWindow.completeTask(tid, null, null)
+        }
         onContinueRequested: {
             bringBack()
             breakOver.hide()

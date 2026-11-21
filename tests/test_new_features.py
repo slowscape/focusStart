@@ -180,7 +180,8 @@ def test_pomodoro_notch_setting():
 
 
 def test_notch_dock_setting_cleaned():
-    s = clean_settings({"notch_dock": {"edge": "bottom", "x": 1.7}})
-    assert s["notch_dock"] == {"edge": "bottom", "x": 1.0}          # clamped to the screen
-    assert "notch_dock" not in clean_settings({"notch_dock": {"edge": "left", "x": 0.2}})
+    s = clean_settings({"notch_dock": {"edge": "bottom", "pos": 1.7}})
+    assert s["notch_dock"] == {"edge": "bottom", "pos": 1.0}        # clamped to the screen
+    assert clean_settings({"notch_dock": {"edge": "left", "pos": 0.2}})["notch_dock"]["edge"] == "left"
+    assert "notch_dock" not in clean_settings({"notch_dock": {"edge": "middle", "pos": 0.2}})
     assert "notch_dock" not in clean_settings({"notch_dock": [10, 20]})

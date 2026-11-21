@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 PHASES = ("work", "short", "long")
+DOCK_EDGES = ("top", "bottom", "left", "right")
 DEFAULTS = {"enabled": True, "work": 25, "short": 5, "long": 15, "long_every": 4,
             "notch": False}  # notch: show the running timer in a pill at the top of the screen
 # Allowed range per setting (minutes, or sessions for long_every). The UI uses the same limits.
@@ -27,12 +28,12 @@ def clean_settings(d: dict | None) -> dict:
         for key in ("enabled", "notch"):
             if isinstance(d.get(key), bool):
                 out[key] = d[key]
-        # Where the notch pill is docked: the top or bottom screen edge, and its centre along it
-        # as a fraction of the screen width (absent = top centre).
+        # Where the notch pill is docked: a screen edge, and its centre along that edge as a
+        # fraction of the edge's length (absent = top centre).
         dock = d.get("notch_dock")
-        if isinstance(dock, dict) and dock.get("edge") in ("top", "bottom") \
-                and isinstance(dock.get("x"), (int, float)):
-            out["notch_dock"] = {"edge": dock["edge"], "x": min(1.0, max(0.0, float(dock["x"])))}
+        if isinstance(dock, dict) and dock.get("edge") in DOCK_EDGES \
+                and isinstance(dock.get("pos"), (int, float)):
+            out["notch_dock"] = {"edge": dock["edge"], "pos": min(1.0, max(0.0, float(dock["pos"])))}
         for k, (lo, hi) in LIMITS.items():
             try:
                 out[k] = max(lo, min(hi, int(d.get(k, out[k]))))

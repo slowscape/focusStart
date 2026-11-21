@@ -160,14 +160,18 @@ the owner changed several things after trying the app (listed under "Decisions")
   (`backend._welcome`, `noticeIsWelcome`). Other notices (save errors, backup restored) show everywhere.
 - Settings > Pomodoro > "Display Pomodoro on notch" (`settings.pomodoro.notch`, default off):
   `PomodoroNotch.qml`, its own frameless always-on-top `Window` (exactly the bar's size, so it never
-  blocks clicks) while the timer runs. A slim bar that never expands: phase + current step (elided)
-  + time + small buttons (Continue when a break is over, pause/resume, stop, skip to the next step
-  when 2+ are left). Black while focusing, green on a break, red when a break is over (owner's
-  choice; an exception to the no-red guardrail). Always docked: top edge (square top corners) or
-  bottom edge just above the taskbar/Dock (square bottom corners). Drag moves it along the edge;
-  dropping in the upper/lower half of the screen picks the edge (own MouseArea drag, not
-  `startSystemMove`, which snapped back on Windows). Saved as `settings.pomodoro.notch_dock`
-  {edge, x = centre as a fraction of the screen width}; double-click resets to top centre; a click
+  blocks clicks; no tooltips, they'd be clipped) while the timer runs. A slim bar that never expands:
+  phase + current step (elided) + time + small buttons: Continue (break over; a play icon on the
+  sides), pause/resume, stop, complete (check: exactly Focus's main button, i.e. the current step,
+  or the task when it has none; in Focus on that task it calls FocusView.done() so the full-screen
+  "Task complete" shows), skip to the next step (2+ left). Black while focusing, green on a break,
+  red when a break is over (owner's choice; an exception to the no-red guardrail).
+  Docked to any edge: dragging follows the mouse along the nearest screen edge (own MouseArea
+  drag; `startSystemMove` snapped back on Windows). Top hangs from the very top (notch); bottom,
+  left and right stay inside the area not covered by the taskbar/Dock. On left/right the bar
+  stands upright: the words row is rotated 90 degrees (reads top to bottom), the buttons stay
+  upright, stacked. Square corners on the docked edge. Saved as `settings.pomodoro.notch_dock`
+  {edge, pos = centre as a fraction along that edge}; double-click resets to top centre; a click
   without dragging opens StepTask. macOS: `qt/notch.py` raises the NSWindow above the menu bar and
   onto every Space via ctypes + the ObjC runtime (no pyobjc).
 - "Current step" is shared: Focus reports its selection (`backend.setFocusStep`), the pill shows it

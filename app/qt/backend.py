@@ -830,7 +830,12 @@ class Backend(QObject):
     pomoStepText = Property(str, _pomo_step_text, notify=pomodoroChanged)
     pomoCanSkip = Property(bool, _pomo_can_skip, notify=pomodoroChanged)
     pomoNotchDock = Property("QVariantMap", lambda self: self._pomo_settings().get("notch_dock")
-                             or {"edge": "top", "x": 0.5}, notify=pomodoroChanged)
+                             or {"edge": "top", "pos": 0.5}, notify=pomodoroChanged)
+    # The pill's check button completes this step (or the task when it has none), like Focus.
+    pomoTaskId = Property(str, lambda self: (self._pomo_task_obj().id if self._pomo_task_obj() else ""),
+                          notify=pomodoroChanged)
+    pomoStepId = Property(str, lambda self: (self._pomo_current_step().id if self._pomo_current_step() else ""),
+                          notify=pomodoroChanged)
 
     @Slot(str)
     def setFocusStep(self, step_id: str):
@@ -854,10 +859,10 @@ class Backend(QObject):
         self.pomodoroChanged.emit()
 
     @Slot(str, float)
-    def setNotchDock(self, edge: str, x: float):
-        """Where the pill was dropped: the top/bottom edge, centre at x (fraction of screen width)."""
-        if edge in ("top", "bottom"):
-            self._pomo_settings()["notch_dock"] = {"edge": edge, "x": min(1.0, max(0.0, float(x)))}
+    def setNotchDock(self, edge: str, pos: float):
+        """Where the pill was dropped: a screen edge, centre at pos (fraction along that edge)."""
+        if edge in ("top", "bottom", "left", "right"):
+            self._pomo_settings()["notch_dock"] = {"edge": edge, "pos": min(1.0, max(0.0, float(pos)))}
             self._schedule_save()
             self.pomodoroChanged.emit()
 
