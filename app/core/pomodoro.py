@@ -27,10 +27,12 @@ def clean_settings(d: dict | None) -> dict:
         for key in ("enabled", "notch"):
             if isinstance(d.get(key), bool):
                 out[key] = d[key]
-        # Where the user dragged the notch pill: [x, y] in screen pixels (absent = top centre).
-        pos = d.get("notch_pos")
-        if isinstance(pos, list) and len(pos) == 2 and all(isinstance(v, (int, float)) for v in pos):
-            out["notch_pos"] = [int(pos[0]), int(pos[1])]
+        # Where the notch pill is docked: the top or bottom screen edge, and its centre along it
+        # as a fraction of the screen width (absent = top centre).
+        dock = d.get("notch_dock")
+        if isinstance(dock, dict) and dock.get("edge") in ("top", "bottom") \
+                and isinstance(dock.get("x"), (int, float)):
+            out["notch_dock"] = {"edge": dock["edge"], "x": min(1.0, max(0.0, float(dock["x"])))}
         for k, (lo, hi) in LIMITS.items():
             try:
                 out[k] = max(lo, min(hi, int(d.get(k, out[k]))))

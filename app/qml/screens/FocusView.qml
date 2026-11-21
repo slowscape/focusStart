@@ -295,25 +295,27 @@ Item {
         }
 
         // ---------------- actions, pinned to the bottom
+        // Buttons sized to their text: Fluent's 96 px minimum made this row 300 px, wider than the
+        // 288 px a 320 px window has, which pushed the whole page into the right margin.
         RowLayout {
             Layout.fillWidth: true
             visible: !screen.finished
             spacing: Theme.s1
-            Button {
+            ActionButton {
                 text: "Skip step"
                 flat: true
                 focusPolicy: Qt.NoFocus
                 visible: screen.canSkip && !screen.viewingDone
                 onClicked: screen.skipStep(1)
             }
-            Button {
+            ActionButton {
                 text: "Mark not done"
                 flat: true
                 focusPolicy: Qt.NoFocus
                 visible: screen.viewingDone
                 onClicked: backend.restoreStep(screen.taskId, screen.current.id)
             }
-            Button {
+            ActionButton {
                 text: "Skip task"
                 flat: true
                 focusPolicy: Qt.NoFocus
@@ -321,7 +323,7 @@ Item {
                 onClicked: { var n = backend.nextTaskAfter(screen.taskId); if (n) screen.taskId = n }
             }
             Item { Layout.fillWidth: true }
-            Button {
+            ActionButton {
                 text: screen.steps.length > 0 ? "+ step" : "Add steps"
                 flat: true
                 focusPolicy: Qt.NoFocus
@@ -413,5 +415,13 @@ Item {
                 onClicked: appWindow.go("myday")
             }
         }
+    }
+
+    component ActionButton: Button {
+        flat: true
+        focusPolicy: Qt.NoFocus
+        leftPadding: 10; rightPadding: 10
+        implicitWidth: implicitContentWidth + leftPadding + rightPadding
+        Layout.minimumWidth: implicitWidth
     }
 }

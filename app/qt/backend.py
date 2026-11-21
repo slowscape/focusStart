@@ -829,8 +829,8 @@ class Backend(QObject):
     pomoTaskTitle = Property(str, _pomo_task_title, notify=pomodoroChanged)
     pomoStepText = Property(str, _pomo_step_text, notify=pomodoroChanged)
     pomoCanSkip = Property(bool, _pomo_can_skip, notify=pomodoroChanged)
-    pomoNotchPos = Property("QVariantList", lambda self: self._pomo_settings().get("notch_pos") or [],
-                            notify=pomodoroChanged)
+    pomoNotchDock = Property("QVariantMap", lambda self: self._pomo_settings().get("notch_dock")
+                             or {"edge": "top", "x": 0.5}, notify=pomodoroChanged)
 
     @Slot(str)
     def setFocusStep(self, step_id: str):
@@ -853,18 +853,31 @@ class Backend(QObject):
         self.focusStepChanged.emit(t.id, nxt.id)
         self.pomodoroChanged.emit()
 
-    @Slot(int, int)
-    def setNotchPos(self, x: int, y: int):
-        self._pomo_settings()["notch_pos"] = [int(x), int(y)]
-        self._schedule_save()
-        self.pomodoroChanged.emit()
-
-    @Slot()
-    def resetNotchPos(self):
-        """Double-click the pill: back to the top centre of the screen."""
-        if self._pomo_settings().pop("notch_pos", None) is not None:
+    @Slot(str, float)
+    def setNotchDock(self, edge: str, x: float):
+        """Where the pill was dropped: the top/bottom edge, centre at x (fraction of screen width)."""
+        if edge in ("top", "bottom"):
+            self._pomo_settings()["notch_dock"] = {"edge": edge, "x": min(1.0, max(0.0, float(x)))}
             self._schedule_save()
             self.pomodoroChanged.emit()
+
+    @Slot()
+    def resetNotchDock(self):
+        """Double-click the pill: back to the top centre of the screen."""
+        if self._pomo_settings().pop("notch_dock", None) is not None:
+            self._schedule_save()
+            self.pomodoroChanged.emit()
+
+    @Slot(int, int, result="QVariantMap")
+    def screenArea(self, x: int, y: int):
+        """The screen under (x, y): its full rectangle and the part not covered by the taskbar/Dock
+        (the pill docks to the very top, or just above the taskbar at the bottom)."""
+        from PySide6.QtCore import QPoint
+        from PySide6.QtGui import QGuiApplication
+        scr = QGuiApplication.screenAt(QPoint(x, y)) or QGuiApplication.primaryScreen()
+        g, a = scr.geometry(), scr.availableGeometry()
+        return {"x": g.x(), "y": g.y(), "w": g.width(), "h": g.height(),
+                "ax": a.x(), "ay": a.y(), "aw": a.width(), "ah": a.height()}
     pomoMax = Property("QVariantMap", lambda self: {k: POMO_LIMITS[k][1] for k in ("work", "short", "long")},
                        constant=True)
 

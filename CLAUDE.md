@@ -50,6 +50,9 @@ the owner changed several things after trying the app (listed under "Decisions")
 - Text fields must not save only on blur: `IconButton` is TabFocus and Done/Skip are NoFocus, so
   Back/Skip task destroy or retarget a still-focused field. `NotesArea.qml` debounces saves, saves
   to the task the text belongs to, and flushes on destruction and on `appWindow.flushEdits()` (window close).
+- Focus's action row uses `ActionButton` (sized to its text): Fluent's 96 px button minimum made
+  three buttons 300 px wide, more than a 320 px window's 288, which pushed the whole Focus page 12 px
+  into the right margin (the "uneven right padding").
 - Header rows must fit 320 px: a RowLayout wider than the window pushes the whole page past the
   right edge (cards cut off). My Day's Done badges are compact Chips in a shrinkable right-to-left
   `Flow` between the title and Print, so they stack instead of widening the row.
@@ -156,15 +159,17 @@ the owner changed several things after trying the app (listed under "Decisions")
 - First-run welcome notice: never on Settings, and cleared for good once any task exists
   (`backend._welcome`, `noticeIsWelcome`). Other notices (save errors, backup restored) show everywhere.
 - Settings > Pomodoro > "Display Pomodoro on notch" (`settings.pomodoro.notch`, default off):
-  `PomodoroNotch.qml`, its own frameless always-on-top `Window` (exactly the pill's size, so it never
-  blocks clicks) while the timer runs. Black while focusing, green on a break, red when a break is
-  over (owner's choice; an exception to the no-red guardrail). Collapsed: phase + the current step
-  (elided) + time. Hover/click expands (no second big timer): ring, task (small) and step (click
-  opens StepTask), buttons Continue / pause-resume / stop / skip (">" = next to-do step, shown only
-  with 2+ to do). Drag to move (`startSystemMove`; saved as `settings.pomodoro.notch_pos`),
-  double-click to reset to top centre. Collapse fades text (90 ms) before shrinking; the body has a
-  fixed width and the pill clips, so text never reflows mid-animation. macOS: `qt/notch.py` raises
-  the NSWindow above the menu bar and onto every Space via ctypes + the ObjC runtime (no pyobjc).
+  `PomodoroNotch.qml`, its own frameless always-on-top `Window` (exactly the bar's size, so it never
+  blocks clicks) while the timer runs. A slim bar that never expands: phase + current step (elided)
+  + time + small buttons (Continue when a break is over, pause/resume, stop, skip to the next step
+  when 2+ are left). Black while focusing, green on a break, red when a break is over (owner's
+  choice; an exception to the no-red guardrail). Always docked: top edge (square top corners) or
+  bottom edge just above the taskbar/Dock (square bottom corners). Drag moves it along the edge;
+  dropping in the upper/lower half of the screen picks the edge (own MouseArea drag, not
+  `startSystemMove`, which snapped back on Windows). Saved as `settings.pomodoro.notch_dock`
+  {edge, x = centre as a fraction of the screen width}; double-click resets to top centre; a click
+  without dragging opens StepTask. macOS: `qt/notch.py` raises the NSWindow above the menu bar and
+  onto every Space via ctypes + the ObjC runtime (no pyobjc).
 - "Current step" is shared: Focus reports its selection (`backend.setFocusStep`), the pill shows it
   (`pomoStepText`) and its skip (`backend.skipStep`) emits `focusStepChanged`, which Focus follows.
 - Task Notes grow with their text (5 lines to start, one spare line below; `NotesArea.growHeight`);

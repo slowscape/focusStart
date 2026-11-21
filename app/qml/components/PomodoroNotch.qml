@@ -3,36 +3,31 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import "../theme"
 
-// Settings > "Display Pomodoro on notch": the running timer as a pill at the top centre of the
-// screen (over the MacBook notch; backend.elevateNotch lifts it above the menu bar), visible over
-// other apps. The window is exactly the pill's size, so it never blocks clicks around it.
-//   Colour: black while focusing, green on a break, red when a break is over (waiting for you).
-//   Collapsed: phase and the current step (shortened) on the left, time on the right.
-//   Hover/click expands it: ring, task and step (click them to open StepTask), and buttons:
-//   Continue (break over), pause/resume, stop, skip to the next step (only with 2+ steps to do).
-//   Drag it anywhere (remembered); double-click puts it back at the top centre.
-// Collapsing fades the text out first, then shrinks: the text never reflows while the pill
-// changes size (fixed-width body, clipped), which used to look squashed.
+// Settings > "Display Pomodoro on notch": the running timer as a slim bar docked to the top or
+// bottom edge of the screen (top centre by default: over the MacBook notch; backend.elevateNotch
+// lifts it above the menu bar), visible over other apps. It never expands: everything is on one
+// line, phase + current step + time, then small buttons (Continue when a break is over,
+// pause/resume, stop, skip to the next step when 2+ are left).
+//   Colour: black while focusing, green on a break, red when a break is over.
+//   Drag it to move it along the edge; dropping it in the upper or lower half of the screen docks
+//   it to the top or the bottom (just above the taskbar/Dock). Remembered. Double-click: back to
+//   top centre. Click (without dragging) the text to open StepTask on the task.
+// The window is exactly the bar's size, so it never blocks clicks around it.
 Window {
     id: notch
     signal openRequested()
     signal continueRequested()
 
     readonly property bool wanted: backend.pomoNotch && backend.pomoEnabled && backend.pomoRunning
-    property bool expanded: false            // what the user asked for (hover/click)
-    property bool sized: false               // the pill's size: follows `expanded`, later when collapsing
     readonly property string phase: backend.pomoPhase
     readonly property bool onBreak: phase === "short" || phase === "long"
     readonly property bool breakOver: backend.pomoWaiting
-    readonly property int phaseTotal: 60 * (phase === "short" ? backend.pomoShort
-                                           : phase === "long" ? backend.pomoLong : backend.pomoWork)
     readonly property color fill: breakOver ? "#b3261e" : onBreak ? "#1f7a35" : "#0b0b0b"
     readonly property color ink: "#f5f5f5"
     readonly property color dim: Qt.rgba(1, 1, 1, 0.68)
     readonly property color grey: "#8a8a8a"
     readonly property int barH: 34
-    readonly property int collapsedW: 300
-    readonly property int expandedW: 360
+    readonly property int barW: 400
 
     function fmt(sec) { return Math.floor(sec / 60) + ":" + ("0" + sec % 60).slice(-2) }
     readonly property string phaseLabel: breakOver ? "Break over"
@@ -43,63 +38,67 @@ Window {
     color: "transparent"
     title: "StepTask timer"
     visible: wanted
-    width: pill.width
-    height: pill.height
-    // Top centre unless the user dragged it somewhere (backend.pomoNotchPos, remembered).
-    readonly property var savedPos: backend.pomoNotchPos
-    x: savedPos.length === 2 ? savedPos[0] : (screen ? screen.virtualX + Math.round((screen.width - width) / 2) : 0)
-    y: savedPos.length === 2 ? savedPos[1] : (screen ? screen.virtualY : 0)
+    width: barW
+    height: barH
 
-    onVisibleChanged: {
-        if (visible) backend.elevateNotch(notch)
-        else { expanded = false; sized = false }
-    }
-    onExpandedChanged: {
-        if (expanded) { shrinkTimer.stop(); sized = true }
-        else shrinkTimer.restart()                 // let the text fade first
-    }
+    // ---- docking: saved edge + centre (fraction of the screen width); live values while dragging
+    readonly property var dock: backend.pomoNotchDock
+    property bool dragging: false
+    property string dragEdge: "top"
+    property real dragX: 0
+    readonly property string edge: dragging ? dragEdge : (dock.edge || "top")
+    readonly property var area: backend.screenArea(screen ? screen.virtualX + 1 : 0, screen ? screen.virtualY + 1 : 0)
+    function clampX(v) { return Math.max(area.x, Math.min(area.x + area.w - width, v)) }
+    x: dragging ? dragX : clampX(Math.round(area.x + (dock.x !== undefined ? dock.x : 0.5) * area.w - width / 2))
+    y: edge === "top" ? area.y : area.ay + area.ah - height
 
-    Timer { id: collapseTimer; interval: 450; onTriggered: notch.expanded = false }
-    Timer { id: shrinkTimer; interval: 90; onTriggered: notch.sized = false }
-    // Remember where the user dropped it (after the system move settles).
-    property bool moving: false
-    Timer { id: saveMoveTimer; interval: 400; onTriggered: { notch.moving = false; backend.setNotchPos(notch.x, notch.y) } }
-    onXChanged: if (moving) saveMoveTimer.restart()
-    onYChanged: if (moving) saveMoveTimer.restart()
+    onVisibleChanged: if (visible) backend.elevateNotch(notch)
 
     Rectangle {
-        id: pill
-        width: notch.sized ? notch.expandedW : notch.collapsedW
-        height: notch.sized ? notch.barH + body.implicitHeight + 14 : notch.barH
+        id: bar
+        anchors.fill: parent
         color: notch.fill
-        radius: 18
-        clip: true
-        Behavior on width { NumberAnimation { duration: Theme.durMed; easing.type: Easing.OutCubic } }
-        Behavior on height { NumberAnimation { duration: Theme.durMed; easing.type: Easing.OutCubic } }
+        radius: 17
         Behavior on color { ColorAnimation { duration: Theme.durSlow } }
-        // Square top corners at the top of the screen (the pill hangs from the edge).
-        Rectangle { width: parent.width; height: parent.radius; color: parent.color; visible: notch.savedPos.length !== 2 }
+        // Square corners on the docked edge: it hangs from the top, or sits on the bottom.
+        Rectangle {
+            width: parent.width; height: parent.radius; color: parent.color
+            y: notch.edge === "top" ? 0 : parent.height - height
+        }
 
-        HoverHandler {
-            onHoveredChanged: {
-                if (hovered) { collapseTimer.stop(); notch.expanded = true }
-                else collapseTimer.restart()
+        // Drag to move / dock; a click without dragging opens StepTask; double-click resets.
+        MouseArea {
+            id: mover
+            anchors.fill: parent
+            property real pressGX: 0
+            property real pressGY: 0
+            property real startX: 0
+            property bool moved: false
+            cursorShape: notch.dragging ? Qt.ClosedHandCursor : Qt.PointingHandCursor
+            onPressed: (m) => { pressGX = notch.x + m.x; pressGY = notch.y + m.y; startX = notch.x; moved = false }
+            onPositionChanged: (m) => {
+                if (!pressed) return
+                var gx = notch.x + m.x, gy = notch.y + m.y
+                if (!moved && Math.abs(gx - pressGX) < 6 && Math.abs(gy - pressGY) < 6) return
+                if (!moved) { moved = true; notch.dragEdge = notch.edge; notch.dragX = notch.x; notch.dragging = true }
+                notch.dragX = notch.clampX(startX + gx - pressGX)
+                notch.dragEdge = gy < notch.area.y + notch.area.h / 2 ? "top" : "bottom"
             }
-        }
-        TapHandler {
-            onTapped: notch.expanded = !notch.expanded
-            onDoubleTapped: backend.resetNotchPos()
-        }
-        // Drag the pill to move it (the system does the move, so it's smooth on every OS).
-        DragHandler {
-            target: null
-            onActiveChanged: if (active) { notch.moving = true; notch.startSystemMove() }
+            onReleased: {
+                if (notch.dragging) {
+                    backend.setNotchDock(notch.dragEdge, (notch.dragX + notch.width / 2 - notch.area.x) / notch.area.w)
+                    notch.dragging = false
+                } else if (!moved) {
+                    notch.openRequested()
+                }
+            }
+            onDoubleClicked: backend.resetNotchDock()
         }
 
-        // Top row: always visible.
         RowLayout {
-            id: top
-            x: 16; width: parent.width - 32; height: notch.barH
+            anchors.fill: parent
+            anchors.leftMargin: 14
+            anchors.rightMargin: 6
             spacing: 8
             Rectangle {
                 width: 8; height: 8; radius: 4
@@ -107,19 +106,16 @@ Window {
                        : backend.pomoPaused ? notch.grey : Theme.accent
             }
             Label { text: notch.phaseLabel; color: notch.dim; font.pixelSize: Theme.fontSmall }
-            // The current step, shortened (focus only). Hidden while expanded: the body shows it.
+            // The current step, shortened (while focusing).
             Label {
                 Layout.fillWidth: true
                 Layout.minimumWidth: 0
-                visible: notch.phase === "work" && !notch.breakOver
-                opacity: notch.expanded ? 0 : 1
-                Behavior on opacity { NumberAnimation { duration: 90 } }
-                text: backend.pomoStepText ? "·  " + backend.pomoStepText : ""
+                text: notch.phase === "work" && !notch.breakOver && backend.pomoStepText
+                      ? "·  " + backend.pomoStepText : ""
                 color: notch.ink
                 elide: Text.ElideRight
                 font.pixelSize: Theme.fontSmall
             }
-            Item { Layout.fillWidth: true; visible: !(notch.phase === "work" && !notch.breakOver) }
             Label {
                 text: notch.fmt(backend.pomoRemaining)
                 color: notch.ink
@@ -128,95 +124,23 @@ Window {
                 font.weight: Font.DemiBold
                 font.features: { "tnum": 1 }
             }
-        }
-
-        // Expanded body. Fixed width (the expanded size), so it never reflows mid-animation.
-        ColumnLayout {
-            id: body
-            x: 16; y: notch.barH; width: notch.expandedW - 32
-            spacing: 10
-            opacity: notch.expanded && pill.width >= notch.expandedW - 6 ? 1 : 0
-            visible: opacity > 0
-            Behavior on opacity { NumberAnimation { duration: 90 } }
-
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.rightMargin: 4
-                spacing: 12
-                Canvas {
-                    id: ring
-                    Layout.alignment: Qt.AlignTop
-                    implicitWidth: 34; implicitHeight: 34
-                    readonly property real frac: notch.phaseTotal > 0 ? 1 - backend.pomoRemaining / notch.phaseTotal : 0
-                    readonly property color stroke: backend.pomoPaused || notch.breakOver ? notch.ink
-                                                    : notch.onBreak ? notch.ink : Theme.accent
-                    onFracChanged: requestPaint()
-                    onStrokeChanged: requestPaint()
-                    onPaint: {
-                        var ctx = getContext("2d"); ctx.reset()
-                        var c = width / 2, r = c - 3
-                        ctx.lineWidth = 4
-                        ctx.strokeStyle = Qt.rgba(1, 1, 1, 0.18)
-                        ctx.beginPath(); ctx.arc(c, c, r, 0, Math.PI * 2); ctx.stroke()
-                        ctx.strokeStyle = stroke; ctx.lineCap = "round"
-                        ctx.beginPath(); ctx.arc(c, c, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0.001, frac)); ctx.stroke()
-                    }
-                }
-                // Task (small) and step; click to open StepTask on this task.
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    spacing: 2
-                    Label {
-                        Layout.fillWidth: true
-                        color: notch.dim
-                        font.pixelSize: Theme.fontSmall
-                        text: notch.phaseLabel + (notch.phase === "work" && !notch.breakOver
-                              ? " · session " + Math.min(backend.pomoWorkDone + 1, backend.pomoLongEvery) + " of " + backend.pomoLongEvery : "")
-                    }
-                    Label {
-                        Layout.fillWidth: true
-                        visible: text !== ""
-                        color: notch.dim
-                        wrapMode: Text.Wrap
-                        maximumLineCount: 2
-                        elide: Text.ElideRight
-                        font.pixelSize: Theme.fontSmall
-                        text: backend.pomoTaskTitle
-                    }
-                    Label {
-                        Layout.fillWidth: true
-                        visible: text !== ""
-                        color: notch.ink
-                        wrapMode: Text.Wrap
-                        maximumLineCount: 3
-                        elide: Text.ElideRight
-                        font.pixelSize: Theme.fontBody
-                        font.weight: Font.DemiBold
-                        text: backend.pomoStepText
-                    }
-                    TapHandler { onTapped: notch.openRequested() }
-                    HoverHandler { cursorShape: Qt.PointingHandCursor }
-                }
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 8
-                Item { Layout.fillWidth: true }
-                NotchButton {
+            Row {
+                spacing: 2
+                Layout.leftMargin: 2
+                BarButton {
                     visible: notch.breakOver
                     label: "Continue"
                     onClicked: notch.continueRequested()
                 }
-                NotchButton {
+                BarButton {
                     visible: !notch.breakOver
                     icon_: backend.pomoPaused ? "play" : "pause"
                     tip: backend.pomoPaused ? "Resume" : "Pause"
                     onClicked: backend.pomoTogglePause()
                 }
-                NotchButton { icon_: "stop"; tip: "Stop and reset"; onClicked: backend.pomoStop() }
-                NotchButton {
-                    visible: backend.pomoCanSkip
+                BarButton { icon_: "stop"; tip: "Stop and reset"; onClicked: backend.pomoStop() }
+                BarButton {
+                    visible: backend.pomoCanSkip && !notch.breakOver
                     icon_: "chevronR"; tip: "Skip to the next step"
                     onClicked: backend.skipStep()
                 }
@@ -224,20 +148,21 @@ Window {
         }
     }
 
-    component NotchButton: AbstractButton {
-        id: nb
+    component BarButton: AbstractButton {
+        id: bb
         property string icon_: ""
         property string label: ""
         property string tip: label
         hoverEnabled: true
         focusPolicy: Qt.NoFocus
-        implicitWidth: label !== "" ? lbl.implicitWidth + 24 : 30
-        implicitHeight: 30
+        implicitWidth: label !== "" ? lbl.implicitWidth + 16 : 26
+        implicitHeight: 26
+        anchors.verticalCenter: parent ? parent.verticalCenter : undefined
         padding: 0
-        background: Rectangle { radius: 15; color: nb.hovered ? Qt.rgba(1, 1, 1, 0.24) : Qt.rgba(1, 1, 1, 0.14) }
+        background: Rectangle { radius: 13; color: bb.hovered ? Qt.rgba(1, 1, 1, 0.22) : "transparent" }
         contentItem: Item {
-            Icon { anchors.centerIn: parent; visible: nb.icon_ !== ""; name: nb.icon_; size: 13; color: notch.ink }
-            Label { id: lbl; anchors.centerIn: parent; visible: nb.label !== ""; text: nb.label; color: notch.ink; font.pixelSize: Theme.fontSmall }
+            Icon { anchors.centerIn: parent; visible: bb.icon_ !== ""; name: bb.icon_; size: 12; color: notch.ink }
+            Label { id: lbl; anchors.centerIn: parent; visible: bb.label !== ""; text: bb.label; color: notch.ink; font.pixelSize: Theme.fontSmall; font.weight: Font.DemiBold }
         }
         Accessible.name: tip
     }

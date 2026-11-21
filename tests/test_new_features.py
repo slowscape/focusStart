@@ -177,3 +177,10 @@ def test_pomodoro_notch_setting():
     assert clean_settings({"notch": True})["notch"] is True
     assert clean_settings({"notch": "yes"})["notch"] is False   # only real booleans count
     assert clean_settings({"notch": 1})["notch"] is False
+
+
+def test_notch_dock_setting_cleaned():
+    s = clean_settings({"notch_dock": {"edge": "bottom", "x": 1.7}})
+    assert s["notch_dock"] == {"edge": "bottom", "x": 1.0}          # clamped to the screen
+    assert "notch_dock" not in clean_settings({"notch_dock": {"edge": "left", "x": 0.2}})
+    assert "notch_dock" not in clean_settings({"notch_dock": [10, 20]})
