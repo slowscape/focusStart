@@ -110,16 +110,18 @@ Window {
             onDoubleClicked: backend.resetNotchDock()
         }
 
-        // The words: one line, turned 90 degrees on the side edges (reading top to bottom).
+        // The words: one line, turned 90 degrees on the side edges.
         Item {
             id: words
             readonly property int pad: 14
             width: (notch.vertical ? bar.height : bar.width) - pad - 6 - controls.alongSize - 6
             height: notch.thick
             transformOrigin: Item.TopLeft
-            rotation: notch.vertical ? 90 : 0
-            x: notch.vertical ? notch.thick : pad
-            y: notch.vertical ? pad : 0
+            // Left edge: turned 90 degrees (reads top to bottom). Right edge: turned the other way
+            // (reads bottom to top), so the words face the screen from either side.
+            rotation: !notch.vertical ? 0 : (notch.edge === "right" ? -90 : 90)
+            x: !notch.vertical ? pad : (notch.edge === "right" ? 0 : notch.thick)
+            y: !notch.vertical ? 0 : (notch.edge === "right" ? pad + width : pad)
             RowLayout {
                 anchors.fill: parent
                 spacing: 8

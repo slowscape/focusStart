@@ -169,7 +169,8 @@ the owner changed several things after trying the app (listed under "Decisions")
   Docked to any edge: dragging follows the mouse along the nearest screen edge (own MouseArea
   drag; `startSystemMove` snapped back on Windows). Top hangs from the very top (notch); bottom,
   left and right stay inside the area not covered by the taskbar/Dock. On left/right the bar
-  stands upright: the words row is rotated 90 degrees (reads top to bottom), the buttons stay
+  stands upright: the words row is rotated 90 degrees (left edge: reads top to bottom; right
+  edge: the other way, bottom to top, so it faces the screen), the buttons stay
   upright, stacked. Square corners on the docked edge. Saved as `settings.pomodoro.notch_dock`
   {edge, pos = centre as a fraction along that edge}; double-click resets to top centre; a click
   without dragging opens StepTask. macOS: `qt/notch.py` raises the NSWindow above the menu bar and
