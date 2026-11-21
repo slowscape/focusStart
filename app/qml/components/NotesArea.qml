@@ -18,6 +18,13 @@ ScrollView {
     property string placeholder: ""
     readonly property bool editing: area.activeFocus
     readonly property real textHeight: area.implicitHeight
+    // For boxes that grow with their text: start `minLines` tall, then always keep one empty line
+    // below the text (Task Notes in Focus and Edit task).
+    readonly property real lineHeight: lineMetrics.height
+    property int minLines: 5
+    readonly property real growHeight: Math.max(minLines * lineHeight + area.topPadding + area.bottomPadding,
+                                                textHeight + lineHeight)
+    FontMetrics { id: lineMetrics; font: area.font }
     signal escaped()
 
     property string _ownerTask: ""           // task/step the text in the field belongs to

@@ -27,6 +27,10 @@ def clean_settings(d: dict | None) -> dict:
         for key in ("enabled", "notch"):
             if isinstance(d.get(key), bool):
                 out[key] = d[key]
+        # Where the user dragged the notch pill: [x, y] in screen pixels (absent = top centre).
+        pos = d.get("notch_pos")
+        if isinstance(pos, list) and len(pos) == 2 and all(isinstance(v, (int, float)) for v in pos):
+            out["notch_pos"] = [int(pos[0]), int(pos[1])]
         for k, (lo, hi) in LIMITS.items():
             try:
                 out[k] = max(lo, min(hi, int(d.get(k, out[k]))))

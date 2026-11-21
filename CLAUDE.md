@@ -156,11 +156,21 @@ the owner changed several things after trying the app (listed under "Decisions")
 - First-run welcome notice: never on Settings, and cleared for good once any task exists
   (`backend._welcome`, `noticeIsWelcome`). Other notices (save errors, backup restored) show everywhere.
 - Settings > Pomodoro > "Display Pomodoro on notch" (`settings.pomodoro.notch`, default off):
-  `PomodoroNotch.qml`, its own frameless always-on-top `Window` at the top centre of the screen while
-  the timer runs. Collapsed: phase left, time right (middle free for the camera notch); hover/click
-  expands (ring, task · step, pause/resume, stop, open; Continue when a break ends). The window is the
-  pill's exact size so it never blocks clicks. macOS: `qt/notch.py` raises the NSWindow above the menu
-  bar and onto every Space via ctypes + the ObjC runtime (no pyobjc); elsewhere it just sits at the top.
+  `PomodoroNotch.qml`, its own frameless always-on-top `Window` (exactly the pill's size, so it never
+  blocks clicks) while the timer runs. Black while focusing, green on a break, red when a break is
+  over (owner's choice; an exception to the no-red guardrail). Collapsed: phase + the current step
+  (elided) + time. Hover/click expands (no second big timer): ring, task (small) and step (click
+  opens StepTask), buttons Continue / pause-resume / stop / skip (">" = next to-do step, shown only
+  with 2+ to do). Drag to move (`startSystemMove`; saved as `settings.pomodoro.notch_pos`),
+  double-click to reset to top centre. Collapse fades text (90 ms) before shrinking; the body has a
+  fixed width and the pill clips, so text never reflows mid-animation. macOS: `qt/notch.py` raises
+  the NSWindow above the menu bar and onto every Space via ctypes + the ObjC runtime (no pyobjc).
+- "Current step" is shared: Focus reports its selection (`backend.setFocusStep`), the pill shows it
+  (`pomoStepText`) and its skip (`backend.skipStep`) emits `focusStepChanged`, which Focus follows.
+- Task Notes grow with their text (5 lines to start, one spare line below; `NotesArea.growHeight`);
+  in Focus they stop at a quarter of the window (then scroll) and Step Notes keep >= 72 px.
+- Focus "+ step" field is cleared when the task changes (text typed for one task used to be added
+  to the next one: the likely cause of a step "inherited" by another task).
 - Positive-only guardrails from SPEC.md section 9 still apply (no streaks, overdue, red, guilt copy).
 
 ## Open issue

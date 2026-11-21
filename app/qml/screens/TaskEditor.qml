@@ -186,7 +186,7 @@ Item {
                     id: notes
                     visible: !screen.finished
                     Layout.fillWidth: true
-                    Layout.preferredHeight: Math.max(72, notes.textHeight)
+                    Layout.preferredHeight: notes.growHeight     // 5 lines to start, grows with one spare line
                     taskId: screen.taskId
                     notes: screen.info.notes || ""
                     onEscaped: screen.forceActiveFocus()

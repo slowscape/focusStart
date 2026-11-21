@@ -51,6 +51,7 @@ class Backend(QObject):
     historyChanged = Signal()
     backgroundChanged = Signal()
     breakOver = Signal(str)       # a break ended; the task to continue (may be "")
+    focusStepChanged = Signal(str, str)   # (task, step) the pill skipped to; Focus follows
 
     def __init__(self, service: Service, store: Store, sounds: SoundBank,
                  notice: str | None = None, first_run: bool = False, parent=None):
@@ -75,6 +76,7 @@ class Backend(QObject):
         self._pomo_timer.timeout.connect(self._pomo_tick)
         self._pomo_task: str | None = None    # the task whose Start began the timer
         self._focus_task: str = ""            # task open in Focus (for the bar's play/power)
+        self._focus_step: str = ""            # step selected in Focus / skipped to on the pill
         self._bg_image = ""
         self._last_encouragement: str | None = None
         self._today = self.svc.today()
@@ -809,13 +811,60 @@ class Backend(QObject):
         t = self._pomo_task_obj()
         return t.title if t else ""
 
-    def _pomo_step_text(self):
+    def _pomo_current_step(self):
+        """The step being worked on: the one selected in Focus (or skipped to on the pill) if it's
+        still to do in the timer's task, else that task's first to-do step."""
         t = self._pomo_task_obj()
         rem = t.remaining_steps if t else []
-        return rem[0].text if rem else ""
+        return next((s for s in rem if s.id == self._focus_step), rem[0] if rem else None)
+
+    def _pomo_step_text(self):
+        s = self._pomo_current_step()
+        return s.text if s else ""
+
+    def _pomo_can_skip(self):
+        t = self._pomo_task_obj()
+        return t is not None and len(t.remaining_steps) > 1
     # For the notch pill: "task · step". Also re-read on every data change (revisionChanged).
     pomoTaskTitle = Property(str, _pomo_task_title, notify=pomodoroChanged)
     pomoStepText = Property(str, _pomo_step_text, notify=pomodoroChanged)
+    pomoCanSkip = Property(bool, _pomo_can_skip, notify=pomodoroChanged)
+    pomoNotchPos = Property("QVariantList", lambda self: self._pomo_settings().get("notch_pos") or [],
+                            notify=pomodoroChanged)
+
+    @Slot(str)
+    def setFocusStep(self, step_id: str):
+        """Focus's selected step (so the pill shows the same one)."""
+        if step_id != self._focus_step:
+            self._focus_step = step_id
+            self.pomodoroChanged.emit()
+
+    @Slot()
+    def skipStep(self):
+        """The pill's skip button: move to the timer task's next to-do step (wrapping), like Skip
+        step in Focus. Nothing is reordered or marked done."""
+        t = self._pomo_task_obj()
+        rem = t.remaining_steps if t else []
+        cur = self._pomo_current_step()
+        if len(rem) < 2 or cur is None:
+            return
+        nxt = rem[(rem.index(cur) + 1) % len(rem)]
+        self._focus_step = nxt.id
+        self.focusStepChanged.emit(t.id, nxt.id)
+        self.pomodoroChanged.emit()
+
+    @Slot(int, int)
+    def setNotchPos(self, x: int, y: int):
+        self._pomo_settings()["notch_pos"] = [int(x), int(y)]
+        self._schedule_save()
+        self.pomodoroChanged.emit()
+
+    @Slot()
+    def resetNotchPos(self):
+        """Double-click the pill: back to the top centre of the screen."""
+        if self._pomo_settings().pop("notch_pos", None) is not None:
+            self._schedule_save()
+            self.pomodoroChanged.emit()
     pomoMax = Property("QVariantMap", lambda self: {k: POMO_LIMITS[k][1] for k in ("work", "short", "long")},
                        constant=True)
 

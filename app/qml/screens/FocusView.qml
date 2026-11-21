@@ -42,11 +42,21 @@ Item {
     }
 
     onTaskIdChanged: {
-        justFinished = false; addRow.open = false; selectedStepId = ""
+        // Clear the "+ step" field too: text typed for one task (no Enter yet) used to stay in
+        // the hidden field and get added to the next task when "+ step" was opened there.
+        justFinished = false; addRow.open = false; addField.clear(); selectedStepId = ""
         appWindow.lastFocusTaskId = taskId
         backend.setFocusTask(taskId)       // the timer's play/power belong to this task
     }
     Component.onCompleted: backend.setFocusTask(taskId)
+    // Share the step being worked on with the notch pill, and follow the pill's skip button.
+    onCurrentChanged: backend.setFocusStep(current && !current.done ? current.id : "")
+    Connections {
+        target: backend
+        function onFocusStepChanged(taskId, stepId) {
+            if (taskId === screen.taskId && (!screen.current || screen.current.id !== stepId)) screen.select(stepId)
+        }
+    }
 
     function select(stepId) {
         if (current && stepId === current.id) return
@@ -262,7 +272,7 @@ Item {
             visible: parent.hasStep
             Layout.fillWidth: true
             Layout.fillHeight: true      // absorbs spare space, so the buttons stay at the bottom
-            Layout.minimumHeight: 48
+            Layout.minimumHeight: 72
             taskId: screen.taskId
             stepId: screen.current ? screen.current.id : ""
             notes: screen.current ? (screen.current.notes || "") : ""
@@ -273,7 +283,11 @@ Item {
             id: notes
             Layout.fillWidth: true
             Layout.fillHeight: !parent.hasStep
-            Layout.preferredHeight: parent.hasStep ? 64 : -1
+            // With a step showing, Task Notes grow with their text (5 lines to start, one spare
+            // line below); Step Notes above take whatever space is left.
+            Layout.preferredHeight: parent.hasStep ? notes.growHeight : -1
+            // ...up to a quarter of the screen (then it scrolls), so Step Notes keep room.
+            Layout.maximumHeight: parent.hasStep ? Math.max(screen.height / 4, 5 * notes.lineHeight + 12) : Number.POSITIVE_INFINITY
             Layout.minimumHeight: 48
             taskId: screen.taskId
             notes: screen.info.notes || ""
