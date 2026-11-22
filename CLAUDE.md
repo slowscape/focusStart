@@ -115,8 +115,9 @@ the owner changed several things after trying the app (listed under "Decisions")
 - No truncation of task or step text anywhere (cards grow; the editor title wraps). Only the Focus
   step text shrinks to fit its fixed area.
 - Cards (My Day, Lists): click the title or a step to edit its words in place (`InlineText`); drag
-  them to reorder; click the card's edge/empty space or its progress ring to open Focus without the
-  timer; the play arrow opens Focus and starts it. "+ Step" (right, greyed) adds steps in the card,
+  them to reorder; the card's edge/empty space is a `ReorderArea` too (click = open Focus without
+  the timer, drag = move the card; added after reordering "went missing" once titles became
+  click-to-edit); the progress ring opens Focus without the timer; the play arrow opens Focus and starts it. "+ Step" (right, greyed) adds steps in the card,
   on the same line as "Completed (N)" (left). Focus: click the title or the big step text to edit.
   My Day's Done pills open History.
 - Lists tab uses the same TaskCard as My Day. Its quick-add has Tomorrow/calendar (default: no date)

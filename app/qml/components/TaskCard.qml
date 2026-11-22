@@ -8,6 +8,7 @@ import "../theme"
 //   click the title or a step  -> edit its words in place
 //   drag the title / a step    -> reorder cards / steps
 //   click the card's edge or its progress ring -> open Focus (timer not started)
+//   drag the card's edge / empty space         -> reorder cards
 //   play -> open Focus and start the timer; "..." -> task menu; "+ Step" -> add steps here
 Rectangle {
     id: card
@@ -35,19 +36,28 @@ Rectangle {
     radius: Theme.radius
     // Set by My Day's list: slightly see-through until hovered. Never darker on hover.
     readonly property bool soft: ListView.view ? (ListView.view.softCards === true) : false
-    color: soft && !cardHover.hovered && !titleDrag.dragging ? Theme.cardSoft : Theme.card
-    border.color: titleDrag.dragging ? Theme.accent : Theme.cardBorder
+    // Dragged by its title or by its edge/empty space (two drag areas, one card).
+    readonly property bool dragging: titleDrag.dragging || edgeDrag.dragging
+    color: soft && !cardHover.hovered && !dragging ? Theme.cardSoft : Theme.card
+    border.color: dragging ? Theme.accent : Theme.cardBorder
     clip: true
-    transform: Translate { y: titleDrag.offset }
-    scale: titleDrag.dragging ? 1.02 : 1
+    transform: Translate { y: titleDrag.dragging ? titleDrag.offset : edgeDrag.offset }
+    scale: dragging ? 1.02 : 1
     Behavior on scale { NumberAnimation { duration: Theme.durFast } }
 
     HoverHandler { id: cardHover }
-    // The card's edge and empty space open Focus without starting the timer.
-    MouseArea {
+    // The card's edge and empty space: a click opens Focus (timer not started); press and drag
+    // moves the card. (Titles and steps keep their own click-to-edit, and drag too.)
+    ReorderArea {
+        id: edgeDrag
         anchors.fill: parent
-        cursorShape: Qt.PointingHandCursor
-        onClicked: appWindow.openFocus(card.itemId, false, true)
+        cursorShape: dragging ? Qt.ClosedHandCursor : Qt.PointingHandCursor
+        row: card
+        view: card.ListView.view
+        index: card.index
+        indicator: card.ListView.view ? (card.ListView.view.dropLine || null) : null
+        onTapped: appWindow.openFocus(card.itemId, false, true)
+        onDropped: (from, to) => card.reorder(from, to)
     }
     function tagPrefix() {
         var out = ""
