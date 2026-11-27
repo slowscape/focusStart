@@ -179,12 +179,13 @@ Item {
                 }
 
                 Label {
-                    visible: !screen.finished || (screen.info.notes || "") !== ""
+                    visible: screen.finished && (screen.info.notes || "") !== ""
                     text: "Task Notes"; color: Theme.subtext; font.pixelSize: Theme.fontSmall
                 }
                 NotesArea {
                     id: notes
                     visible: !screen.finished
+                    label: "Task Notes"
                     Layout.fillWidth: true
                     Layout.preferredHeight: notes.growHeight     // 5 lines to start, grows with one spare line
                     taskId: screen.taskId

@@ -46,8 +46,13 @@ The first run creates `.venv` and installs PySide6, like on Windows. Data lives 
   another day's tasks to move it to that day.
 - **Repeat:** Edit task > Repeat. When you finish it, the next copy is planned automatically.
 - **Background:** Settings > Background, pick a folder of pictures.
-- **Notes:** start a line with `- ` or `* ` for bullets; Enter continues them, Enter on an empty
-  bullet ends the list.
+- **Notes tab:** general notes (first line is the title). Search, pin to top, and tag them. A note
+  opens for reading; tap the pencil to edit, Done (or Esc) to stop. Ctrl+N on the Notes tab makes
+  a new one; an empty note disappears when you leave it. History is the clock icon by the gear.
+- **Formatting (Notes tab, Task Notes, Step Notes):** `**bold**`, `*italic*`, `[text](https://...)`
+  links, `---` for a line, `- ` bullets and `[ ] ` checkboxes (tick them while reading). The toolbar
+  above the text does the same. Enter continues a bullet or checkbox list; Enter on an empty item
+  ends it. Task and Step Notes switch to editing with their Edit button.
 - **Light/dark:** Settings > Appearance (System, Light or Dark).
 - **Print:** the printer icon on My Day, or a list's "..." menu, saves a checklist PDF and opens it.
 - **Focus:** click any grey segment in the step bar to work on that step next.
@@ -67,6 +72,6 @@ Icons are a trimmed copy of Microsoft's Fluent UI System Icons (MIT, licence in
 `app/assets/fonts/`); rebuild with `tools/subset_icons.py` (needs `fonttools`, see its header).
 
 ## Layout
-- `app/core/`: pure Python, no Qt (models, store, service, dates, progress, history, pomodoro, printout, phrases). Unit-tested.
+- `app/core/`: pure Python, no Qt (models, store, service, dates, progress, history, pomodoro, printout, phrases, notes). Unit-tested.
 - `app/qt/`: thin bridge (backend QObject, keyed list models, sound pool).
 - `app/qml/`: UI (FluentWinUI3 style).

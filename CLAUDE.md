@@ -17,7 +17,7 @@ the owner changed several things after trying the app (listed under "Decisions")
 - `app/core/`: pure Python, no Qt. All mutations go through `service.py`. `models.py` keeps unknown
   JSON keys in `extra` (forward compatibility). `store.py`: atomic writes, daily backups (14 kept),
   corrupt-file recovery, refuses newer `schema_version`. `progress.py`: today's done/remaining units (badges, Day complete).
-  `history.py`, `pomodoro.py` (pure timer logic, time passed in), `printout.py` (what goes on a
+  `history.py`, `notes.py` (notes titles/previews, markdown blocks, toolbar transforms), `pomodoro.py` (pure timer logic, time passed in), `printout.py` (what goes on a
   printed checklist; `qt/pdf.py` draws it with QPainter + QPdfWriter, no extra installs).
 - `app/qt/`: thin bridge. `backend.py` is the QObject exposed to QML as `backend`. `models.py`:
   `KeyedListModel.sync()` emits real insert/remove/move rows (never resets; ListView transitions need
@@ -44,7 +44,7 @@ the owner changed several things after trying the app (listed under "Decisions")
 - Fluent `TextArea`/`TabButton` have style minimum sizes. `StepInput` overrides `implicitHeight`; tab
   widths derive from `appWindow.width` (deriving them from the TabBar caused a binding loop).
   The four tab widths must sum to <= the TabBar's availableWidth (`appWindow.tabSpace` subtracts its
-  4+4 px padding); otherwise the bar scrolls a few px per selected tab and the tabs shift on switch.
+  4+4 px padding and the two 36 px icons); otherwise the bar scrolls a few px per selected tab and the tabs shift on switch.
 - Avoid `Drawer`, `StackView`, `SplitView`, `SwipeView` (Fluent falls back to Fusion). The Lists side
   panel is a custom slide-out.
 - Text fields must not save only on blur: `IconButton` is TabFocus and Done/Skip are NoFocus, so
@@ -157,8 +157,8 @@ the owner changed several things after trying the app (listed under "Decisions")
   name. `main.default_data_dir` renames a legacy `FocusStart` data folder on first run (falls back to it
   if the rename fails, e.g. the old app is open).
 - Break-over prompt shows the task's own step ring and "N of M steps done" (none for step-less tasks).
-- Notes auto-bullets: a line starting "- " or "* " (any indent) continues on Enter; Enter on an empty
-  bullet ends the list; Shift+Enter is a plain newline (`NotesArea` Keys.onPressed).
+- Notes auto-bullets: a line starting "- ", "* " or "[ ] " (any indent) continues on Enter; Enter on an
+  empty item ends the list; Shift+Enter is a plain newline (`MarkdownField` Keys.onPressed).
 - Undo toast: 3 s (paused on hover); clicking it dismisses it; Undo still works.
 - Settings > Appearance: System / Light / Dark (`settings.appearance`), applied via
   `QStyleHints.setColorScheme` (Qt 6.8+); the Fluent style and palette follow live.
@@ -187,6 +187,20 @@ the owner changed several things after trying the app (listed under "Decisions")
   in Focus they stop at a quarter of the window (then scroll) and Step Notes keep >= 72 px.
 - Focus "+ step" field is cleared when the task changes (text typed for one task used to be added
   to the next one: the likely cause of a step "inherited" by another task).
+- **Notes tab** (4th text tab; History moved to a clock icon beside the gear, an "icon screen" like
+  Settings: `appWindow.iconScreens`). `AppData.notes` (`Note`: body, pinned, tags in `extra.tags`);
+  first line = title. List: Pinned then newest edited, search over title/body/tag names
+  (`backend.noteQuery`), "..." Pin/Delete (confirmed). `NoteEditor.qml` opens in reading mode;
+  only the pencil starts editing (owner: editing must not be easy to start); Done/Esc end it.
+  New notes open editing; leaving an empty note (no text, tags or pin) deletes it.
+  Ctrl+N on Notes/a note makes a new note. Tab labels drop to 13 px below 360 px wide.
+- **Markdown in notes** (Notes tab, Task Notes, Step Notes): `**bold**`, `*italic*`, `[t](url)`,
+  `---`, `- `/`* ` bullets, `[ ]`/`[x]` checkboxes; nothing else promised. Parsing and the toolbar's
+  text transforms live in `core/notes.py` (tested); QML calls them via `backend.md*`. Reading uses
+  `MarkdownView` (Qt's `Text.MarkdownText` per run of lines, checkbox lines as rows with a
+  CheckCircle that ticks and saves); links open only for http(s)/mailto (`backend.openLink`).
+  `NotesArea` has its own label row with an Edit/Done button (`EditToggle`) and shows the reading
+  view unless editing; changing task/step leaves edit mode. Enter continues bullets and checkboxes.
 - Positive-only guardrails from SPEC.md section 9 still apply (no streaks, overdue, red, guilt copy).
 
 ## Open issue

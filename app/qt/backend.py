@@ -11,6 +11,7 @@ from PySide6.QtCore import Property, QObject, Qt, QTimer, QUrl, Signal, Slot
 from PySide6.QtGui import QDesktopServices, QGuiApplication
 
 from ..core import dates, history, phrases, printout
+from ..core import notes as md
 from ..core.pomodoro import LIMITS as POMO_LIMITS, Pomodoro, clamp as pomo_clamp
 from ..core.models import TAG_COLORS, Task
 from ..core.service import Service
@@ -25,6 +26,8 @@ TASK_ROLES = ["title", "notes", "plannedDate", "dateLabel", "listId", "listName"
               "stepTotal", "stepDone", "stepRemaining", "section", "inMyDay", "completedOpen",
               "tagColors", "tagNames", "repeat"]
 TAG_ROLES = ["name", "color"]
+NOTE_ROLES = ["title", "preview", "editedLabel", "pinned", "tagColors", "tagNames",
+              "checkDone", "checkTotal", "section"]
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".gif"}
 REPEAT_LABELS = {"daily": "Every day", "weekdays": "Every weekday", "weekly": "Every week",
                  "monthly": "Every month"}
@@ -87,6 +90,8 @@ class Backend(QObject):
         self._list_tasks = KeyedListModel(TASK_ROLES, self)
         self._lists = KeyedListModel(LIST_ROLES, self)
         self._tags = KeyedListModel(TAG_ROLES, self)
+        self._notes = KeyedListModel(NOTE_ROLES, self)
+        self._note_query = ""
         self._current_list = self.svc.default_list_id()
 
         self._save_timer = QTimer(self)
@@ -183,6 +188,7 @@ class Backend(QObject):
         self._lists.sync([{"id": l.id, "name": l.name, "count": self.svc.incomplete_count(l.id)}
                           for l in self.svc.lists()])
         self._tags.sync([{"id": g.id, "name": g.name, "color": g.color} for g in self.svc.tags()])
+        self._notes.sync([self._note_item(n) for n in self.svc.notes(self._note_query)])
         for task_id, model in self._step_models.items():
             t = self.svc.task(task_id)
             model.sync([{"id": s.id, "text": s.text} for s in (t.remaining_steps if t else [])])
@@ -218,6 +224,7 @@ class Backend(QObject):
     listTasksModel = Property(QObject, lambda self: self._list_tasks, constant=True)
     listsModel = Property(QObject, lambda self: self._lists, constant=True)
     tagsModel = Property(QObject, lambda self: self._tags, constant=True)
+    notesModel = Property(QObject, lambda self: self._notes, constant=True)
 
     def _get_today_label(self):
         d = self.svc.today()
@@ -698,6 +705,132 @@ class Backend(QObject):
     @Slot(str, result=str)
     def dateLabel(self, iso: str) -> str:
         return self._date_label(iso or None, self.svc.today())
+
+    # ================================================================ notes (Notes tab)
+    def _edited_label(self, ts: str) -> str:
+        when = datetime.fromisoformat(ts)
+        today = self.svc.today()
+        d = when.date()
+        if d == today:
+            return "Today " + history.time_label(when)
+        if d == today - timedelta(days=1):
+            return "Yesterday"
+        if timedelta(0) < today - d < timedelta(days=7):
+            return d.strftime("%a")
+        label = f"{d.strftime('%b')} {d.day}"
+        return label if d.year == today.year else f"{label}, {d.year}"
+
+    def _note_item(self, n) -> dict:
+        tags = [g for g in (self.svc.tag_by_id(i) for i in n.tag_ids) if g is not None]
+        done, total = md.checklist_counts(n.body)
+        return {"id": n.id, "title": md.title_of(n.body) or "New note", "preview": md.preview_of(n.body),
+                "editedLabel": self._edited_label(n.updated_at), "pinned": n.pinned,
+                "tagColors": [g.color for g in tags], "tagNames": [g.name for g in tags],
+                "checkDone": done, "checkTotal": total, "section": "Pinned" if n.pinned else "Notes"}
+
+    noteQueryChanged = Signal()
+
+    def _set_note_query(self, q: str):
+        if q != self._note_query:
+            self._note_query = q
+            self._notes.sync([self._note_item(n) for n in self.svc.notes(q)])
+            self.noteQueryChanged.emit()
+    noteQuery = Property(str, lambda self: self._note_query, _set_note_query, notify=noteQueryChanged)
+    noteCount = Property(int, lambda self: len(self.svc.data.notes), notify=revisionChanged)
+
+    @Slot(result=str)
+    def addNote(self) -> str:
+        n = self.svc.add_note()
+        self._mutated()
+        return n.id
+
+    @Slot(str, result="QVariantMap")
+    def noteInfo(self, note_id: str):
+        n = self.svc.note(note_id)
+        if n is None:
+            return {"exists": False}
+        return {"exists": True, "id": n.id, "body": n.body, "title": md.title_of(n.body) or "New note", "pinned": n.pinned, "tagIds": n.tag_ids,
+                "editedLabel": self._edited_label(n.updated_at),
+                "blocks": md.blocks(n.body, title_first=True)}
+
+    @Slot(str, str)
+    def setNoteBody(self, note_id: str, body: str):
+        n = self.svc.note(note_id)
+        if n is not None and n.body != body:
+            self.svc.update_note(note_id, body)
+            self._mutated()
+
+    @Slot(str, bool)
+    def setNotePinned(self, note_id: str, pinned: bool):
+        self.svc.set_note_pinned(note_id, pinned)
+        self._mutated()
+
+    @Slot(str, "QVariantList")
+    def setNoteTags(self, note_id: str, ids):
+        self.svc.set_note_tags(note_id, [str(i) for i in ids])
+        self._mutated()
+
+    @Slot(str, int)
+    def toggleNoteCheck(self, note_id: str, line: int):
+        self.svc.toggle_note_check(note_id, line)
+        self._mutated()
+
+    @Slot(str)
+    def deleteNote(self, note_id: str):
+        self.svc.delete_note(note_id)
+        self._mutated()
+
+    @Slot(str, result=bool)
+    def dropNoteIfEmpty(self, note_id: str) -> bool:
+        if self.svc.drop_note_if_empty(note_id):
+            self._mutated()
+            return True
+        return False
+
+    # ================================================================ markdown (notes everywhere)
+    @Slot(str, bool, result="QVariantList")
+    def mdBlocks(self, text: str, title_first: bool):
+        return md.blocks(text, title_first)
+
+    @Slot(str, int, int, str, result="QVariantMap")
+    def mdWrap(self, text: str, start: int, end: int, marker: str):
+        t, a, b = md.wrap(text, start, end, marker)
+        return {"text": t, "start": a, "end": b}
+
+    @Slot(str, int, int, str, str, result="QVariantMap")
+    def mdLink(self, text: str, start: int, end: int, url: str, label: str):
+        t, a, b = md.insert_link(text, start, end, url, label)
+        return {"text": t, "start": a, "end": b}
+
+    @Slot(str, int, result="QVariantMap")
+    def mdRule(self, text: str, pos: int):
+        t, a, b = md.insert_rule(text, pos)
+        return {"text": t, "start": a, "end": b}
+
+    @Slot(str, int, int, str, result="QVariantMap")
+    def mdPrefix(self, text: str, start: int, end: int, kind: str):
+        t, a, b = md.toggle_prefix(text, start, end, kind)
+        return {"text": t, "start": a, "end": b}
+
+    @Slot(str)
+    def openLink(self, url: str):
+        """Links in notes: web and mail only (never files or scripts)."""
+        if md.safe_link(url):
+            QDesktopServices.openUrl(QUrl(url.strip()))
+
+    @Slot(str, str, int)
+    def toggleNotesCheck(self, task_id: str, step_id: str, line: int):
+        """Tick a checkbox inside a task's notes (step_id "") or a step's notes."""
+        t = self.svc.task(task_id)
+        if t is None:
+            return
+        if step_id:
+            s_ = t.step(step_id)
+            if s_ is not None:
+                self.svc.set_step_notes(task_id, step_id, md.toggle_check(s_.notes, line))
+        else:
+            self.svc.update_task(task_id, notes=md.toggle_check(t.notes, line))
+        self._mutated()
 
     # ================================================================ print / PDF
     def _print_source(self, kind: str):

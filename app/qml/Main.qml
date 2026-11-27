@@ -24,12 +24,15 @@ ApplicationWindow {
     Binding { target: Theme; property: "effects"; value: backend.effects }
 
     // ----------------------------------------------------------- navigation
-    // Room for the four tabs: window width minus the row's margins (12), the gear (36) and the
+    // Room for the four tabs: window width minus the row's margins (12), History + gear (2 x 36) and the
     // Fluent TabBar's own padding (4 + 4). If the tabs add up to more, the bar scrolls a few px
     // depending on the selected tab, and the tabs shift when switching. From appWindow.width
     // (not the TabBar's width) to avoid a binding loop.
-    readonly property real tabSpace: width - 12 - 36 - 8 - 4
-    readonly property var tabs: ["myday", "upcoming", "lists", "history"]
+    readonly property real tabSpace: width - 12 - 72 - 8 - 4
+    readonly property var tabs: ["myday", "upcoming", "lists", "notes"]
+    // History and Settings are icon buttons beside the tabs; they count as top-level screens too.
+    readonly property var iconScreens: ["history", "settings"]
+    readonly property int tabFont: width < 360 ? 13 : 14
     property string lastFocusTaskId: ""
     property string screen: "myday"
     property var screenParams: ({})
@@ -38,18 +41,19 @@ ApplicationWindow {
     // Asks open editors (task notes) to save now; the app writes to disk on quit right after.
     signal flushEdits()
     onClosing: flushEdits()
-    readonly property bool tabScreen: tabs.indexOf(screen) >= 0 || screen === "settings"
+    readonly property bool tabScreen: tabs.indexOf(screen) >= 0 || iconScreens.indexOf(screen) >= 0
 
     readonly property var screenFiles: ({
         myday: "screens/MyDay.qml", upcoming: "screens/Upcoming.qml", lists: "screens/Lists.qml",
         settings: "screens/Settings.qml", focus: "screens/FocusView.qml", plan: "screens/PlanSteps.qml",
-        history: "screens/History.qml", editor: "screens/TaskEditor.qml"
+        history: "screens/History.qml", editor: "screens/TaskEditor.qml",
+        notes: "screens/Notes.qml", note: "screens/NoteEditor.qml"
     })
 
     function go(name, params) {
         if (screen !== name || JSON.stringify(params || {}) !== JSON.stringify(screenParams)) {
             if (!tabScreen) history.push({ screen: screen, params: screenParams })
-            if (tabs.indexOf(name) >= 0 || name === "settings") history = []
+            if (tabs.indexOf(name) >= 0 || iconScreens.indexOf(name) >= 0) history = []
             if (tabs.indexOf(name) >= 0) lastTab = name
             screenParams = params || {}
             screen = name
@@ -132,6 +136,12 @@ ApplicationWindow {
     }
     property var _dateCallback: null
     function pickDate(cb) { _dateCallback = cb; datePopup.open() }
+    function newNote() { go("note", { noteId: backend.addNote(), startEditing: true }) }
+    function confirmDeleteNote(noteId, title) {
+        noteDeleteDialog.noteId = noteId
+        noteDeleteDialog.noteTitle = title
+        noteDeleteDialog.open()
+    }
     property string _deleteId: ""
     function confirmDelete(taskId) {
         _deleteId = taskId
@@ -157,7 +167,8 @@ ApplicationWindow {
     Shortcut {
         sequence: "Ctrl+N"
         onActivated: {
-            if (appWindow.screen === "myday" && loader.item) loader.item.focusAdd()
+            if (appWindow.screen === "notes" || appWindow.screen === "note") appWindow.newNote()
+            else if (appWindow.screen === "myday" && loader.item) loader.item.focusAdd()
             else appWindow.go("myday", { focusQuickAdd: true })
         }
     }
@@ -165,7 +176,7 @@ ApplicationWindow {
         // Only enabled when it has something to do, so it never clashes with a
         // screen's own Esc (e.g. closing the Lists side panel).
         sequence: "Esc"
-        enabled: !dayOverlay.open && !breakOver.open && (!appWindow.tabScreen || appWindow.screen === "settings")
+        enabled: !dayOverlay.open && !breakOver.open && (!appWindow.tabScreen || appWindow.iconScreens.indexOf(appWindow.screen) >= 0)
         onActivated: appWindow.back()
     }
 
@@ -192,10 +203,16 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 background: Item {}
                 currentIndex: appWindow.tabs.indexOf(appWindow.screen)
-                TabButton { focusPolicy: Qt.NoFocus; text: "My Day"; width: appWindow.tabSpace * 0.24; leftPadding: 2; rightPadding: 2; onClicked: appWindow.go("myday") }
-                TabButton { focusPolicy: Qt.NoFocus; text: "Upcoming"; width: appWindow.tabSpace * 0.3; leftPadding: 2; rightPadding: 2; onClicked: appWindow.go("upcoming") }
-                TabButton { focusPolicy: Qt.NoFocus; text: "Lists"; width: appWindow.tabSpace * 0.2; leftPadding: 2; rightPadding: 2; onClicked: appWindow.go("lists") }
-                TabButton { focusPolicy: Qt.NoFocus; text: "History"; width: appWindow.tabSpace * 0.26; leftPadding: 2; rightPadding: 2; onClicked: appWindow.go("history") }
+                // Narrow windows: 13 px labels so "Upcoming" fits its share without clipping.
+                TabButton { focusPolicy: Qt.NoFocus; text: "My Day"; width: appWindow.tabSpace * 0.26; font.pixelSize: appWindow.tabFont; leftPadding: 2; rightPadding: 2; onClicked: appWindow.go("myday") }
+                TabButton { focusPolicy: Qt.NoFocus; text: "Upcoming"; width: appWindow.tabSpace * 0.31; font.pixelSize: appWindow.tabFont; leftPadding: 2; rightPadding: 2; onClicked: appWindow.go("upcoming") }
+                TabButton { focusPolicy: Qt.NoFocus; text: "Lists"; width: appWindow.tabSpace * 0.21; font.pixelSize: appWindow.tabFont; leftPadding: 2; rightPadding: 2; onClicked: appWindow.go("lists") }
+                TabButton { focusPolicy: Qt.NoFocus; text: "Notes"; width: appWindow.tabSpace * 0.22; font.pixelSize: appWindow.tabFont; leftPadding: 2; rightPadding: 2; onClicked: appWindow.go("notes") }
+            }
+            IconButton {
+                icon_: "history"; tip: "History"
+                iconColor: appWindow.screen === "history" ? Theme.accent : Theme.textColor
+                onClicked: appWindow.screen === "history" ? appWindow.back() : appWindow.go("history")
             }
             IconButton {
                 icon_: "settings"; tip: "Settings"
@@ -396,6 +413,30 @@ ApplicationWindow {
             if (appWindow.screen === "editor" || appWindow.screen === "focus" || appWindow.screen === "plan") appWindow.back()
             if (fromHistory) backend.deleteFromHistory(id)
             else backend.deleteTask(id)
+        }
+    }
+
+    Dialog {
+        id: noteDeleteDialog
+        property string noteId: ""
+        property string noteTitle: ""
+        anchors.centerIn: Overlay.overlay
+        width: Math.min(320, appWindow.width - 32)
+        modal: true
+        title: "Delete this note?"
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        // In a layout: a bare wrapping Label made Fluent's Dialog report a height binding loop.
+        contentItem: ColumnLayout {
+            Label {
+                Layout.fillWidth: true
+                Layout.preferredWidth: 1
+                wrapMode: Text.Wrap
+                text: "“" + noteDeleteDialog.noteTitle + "” will be removed. This can't be undone."
+            }
+        }
+        onAccepted: {
+            if (appWindow.screen === "note") appWindow.back()
+            backend.deleteNote(noteId)
         }
     }
 }

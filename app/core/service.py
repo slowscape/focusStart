@@ -10,7 +10,8 @@ from typing import Any
 
 from . import dates, progress
 from .dates import Clock, local_date_of, parse_date, to_iso
-from .models import TAG_COLORS, AppData, Step, Tag, Task, TaskList, new_id
+from . import notes as md
+from .models import TAG_COLORS, AppData, Note, Step, Tag, Task, TaskList, new_id
 
 _UNSET: Any = object()
 UNDO_KEEP = 30
@@ -514,6 +515,13 @@ class Service:
         if g is None:
             return
         self.data.tags.remove(g)
+        for n in self.data.notes:
+            if tag_id in n.tag_ids:
+                rest = [i for i in n.tag_ids if i != tag_id]
+                if rest:
+                    n.extra["tags"] = rest
+                else:
+                    n.extra.pop("tags", None)
         for t in self.data.tasks:
             if tag_id in t.tag_ids:
                 rest = [i for i in t.tag_ids if i != tag_id]
@@ -531,6 +539,69 @@ class Service:
         else:
             t.extra.pop("tags", None)
         self._changed()
+
+    # ---------- notes ----------
+    def note(self, note_id: str) -> Note | None:
+        return next((n for n in self.data.notes if n.id == note_id), None)
+
+    def notes(self, query: str = "") -> list[Note]:
+        """Pinned first, then the rest; each newest-edited first. `query` filters by words in
+        the title, body or tag names (all words must appear, any case)."""
+        names = {g.id: g.name for g in self.data.tags}
+        hits = [n for n in self.data.notes
+                if md.matches(n.body, query, [names[i] for i in n.tag_ids if i in names])]
+        hits.sort(key=lambda n: n.updated_at, reverse=True)
+        return sorted(hits, key=lambda n: not n.pinned)   # stable: keeps edit order in groups
+
+    def add_note(self, body: str = "") -> Note:
+        now = self.now_iso()
+        n = Note(id=new_id(), body=body, created_at=now, updated_at=now)
+        self.data.notes.append(n)
+        self._changed()
+        return n
+
+    def update_note(self, note_id: str, body: str) -> None:
+        n = self.note(note_id)
+        if n is not None and n.body != body:
+            n.body = body
+            n.updated_at = self.now_iso()
+            self._changed()
+
+    def set_note_pinned(self, note_id: str, pinned: bool) -> None:
+        n = self.note(note_id)
+        if n is not None and n.pinned != bool(pinned):
+            n.pinned = bool(pinned)
+            self._changed()
+
+    def set_note_tags(self, note_id: str, tag_ids: list[str]) -> None:
+        n = self.note(note_id)
+        if n is None:
+            return
+        ids = [i for i in dict.fromkeys(tag_ids) if self.tag_by_id(i)]
+        if ids:
+            n.extra["tags"] = ids
+        else:
+            n.extra.pop("tags", None)
+        self._changed()
+
+    def toggle_note_check(self, note_id: str, line: int) -> None:
+        n = self.note(note_id)
+        if n is not None:
+            self.update_note(note_id, md.toggle_check(n.body, line))
+
+    def delete_note(self, note_id: str) -> None:
+        n = self.note(note_id)
+        if n is not None:
+            self.data.notes.remove(n)
+            self._changed()
+
+    def drop_note_if_empty(self, note_id: str) -> bool:
+        """Leaving a note with no words at all removes it (stray "New note" taps)."""
+        n = self.note(note_id)
+        if n is not None and not n.body.strip() and not n.tag_ids and not n.pinned:
+            self.delete_note(note_id)
+            return True
+        return False
 
     # ---------- settings ----------
     def set_setting(self, name: str, value) -> None:

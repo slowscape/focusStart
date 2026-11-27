@@ -262,33 +262,29 @@ Item {
         // Notes: the current step's own notes fill the middle; the task's notes sit below,
         // smaller. A task without steps has only its task notes.
         readonly property bool hasStep: screen.current !== null && !screen.finished
-        Label {
-            visible: parent.hasStep
-            text: screen.viewingDone ? "Step Notes (done step)" : "Step Notes"
-            color: Theme.subtext; font.pixelSize: Theme.fontSmall
-        }
         NotesArea {
             id: stepNotes
             visible: parent.hasStep
+            label: screen.viewingDone ? "Step Notes (done step)" : "Step Notes"
             Layout.fillWidth: true
             Layout.fillHeight: true      // absorbs spare space, so the buttons stay at the bottom
-            Layout.minimumHeight: 72
+            Layout.minimumHeight: 72 + stepNotes.headerHeight
             taskId: screen.taskId
             stepId: screen.current ? screen.current.id : ""
             notes: screen.current ? (screen.current.notes || "") : ""
             onEscaped: screen.forceActiveFocus()
         }
-        Label { text: "Task Notes"; color: Theme.subtext; font.pixelSize: Theme.fontSmall }
         NotesArea {
             id: notes
+            label: "Task Notes"
             Layout.fillWidth: true
             Layout.fillHeight: !parent.hasStep
             // With a step showing, Task Notes grow with their text (5 lines to start, one spare
             // line below); Step Notes above take whatever space is left.
             Layout.preferredHeight: parent.hasStep ? notes.growHeight : -1
             // ...up to a quarter of the screen (then it scrolls), so Step Notes keep room.
-            Layout.maximumHeight: parent.hasStep ? Math.max(screen.height / 4, 5 * notes.lineHeight + 12) : Number.POSITIVE_INFINITY
-            Layout.minimumHeight: 48
+            Layout.maximumHeight: parent.hasStep ? Math.max(screen.height / 4, 5 * notes.lineHeight + 12 + notes.headerHeight) : Number.POSITIVE_INFINITY
+            Layout.minimumHeight: 48 + notes.headerHeight
             taskId: screen.taskId
             notes: screen.info.notes || ""
             onEscaped: screen.forceActiveFocus()

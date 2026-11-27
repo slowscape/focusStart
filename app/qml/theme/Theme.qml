@@ -70,7 +70,17 @@ QtObject {
         "close":    ["\uF369", 0.500, 0.500],
         "delete":   ["\uF34C", 0.500, 0.513],
         "edit":     ["\uF3DD", 0.499, 0.499],
-        "grip":     ["\uE9F8", 0.500, 0.500]
+        "grip":     ["\uE9F8", 0.500, 0.500],
+        "history":  ["\uF47E", 0.503, 0.499],
+        "search":   ["\uF68F", 0.520, 0.480],
+        "pin":      ["\uF601", 0.525, 0.526],
+        "pinOff":   ["\uF603", 0.500, 0.500],
+        "bold":     ["\uF7A4", 0.513, 0.500],
+        "italic":   ["\uF7F4", 0.501, 0.500],
+        "link":     ["\uF4E4", 0.500, 0.500],
+        "rule":     ["\uF4E0", 0.500, 0.525],
+        "bullets":  ["\uECD9", 0.500, 0.526],
+        "checkbox": ["\uF291", 0.500, 0.500]
     })
     // [character, ink centre x, ink centre y up from the baseline] per icon (fractions of the em).
     function glyph(name) {

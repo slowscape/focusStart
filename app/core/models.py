@@ -179,6 +179,39 @@ class Task:
 
 
 @dataclass
+class Note:
+    """A general note (Notes tab). The first line is its title; tags live in extra.tags."""
+    id: str
+    created_at: str
+    updated_at: str
+    body: str = ""
+    pinned: bool = False
+    extra: dict = field(default_factory=dict)
+
+    KEYS = {"id", "body", "created_at", "updated_at", "pinned"}
+
+    @property
+    def tag_ids(self) -> list[str]:
+        v = self.extra.get("tags")
+        return [x for x in v if isinstance(x, str)] if isinstance(v, list) else []
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "Note":
+        body = d.get("body") if isinstance(d.get("body"), str) else ""
+        created = _check_ts(_req_str(d, "created_at"))
+        updated = d.get("updated_at") if isinstance(d.get("updated_at"), str) else created
+        return cls(id=_req_str(d, "id"), body=body, created_at=created,
+                   updated_at=_check_ts(updated), pinned=bool(d.get("pinned", False)),
+                   extra=_split(d, cls.KEYS))
+
+    def to_dict(self) -> dict:
+        out = dict(self.extra)
+        out.update(id=self.id, body=self.body, created_at=self.created_at,
+                   updated_at=self.updated_at, pinned=self.pinned)
+        return out
+
+
+@dataclass
 class TaskList:
     id: str
     name: str
@@ -301,10 +334,11 @@ class AppData:
     lists: list[TaskList] = field(default_factory=list)
     tasks: list[Task] = field(default_factory=list)
     tags: list[Tag] = field(default_factory=list)
+    notes: list[Note] = field(default_factory=list)
     schema_version: int = SCHEMA_VERSION
     extra: dict = field(default_factory=dict)
 
-    KEYS = {"schema_version", "settings", "lists", "tasks", "tags"}
+    KEYS = {"schema_version", "settings", "lists", "tasks", "tags", "notes"}
 
     @classmethod
     def new(cls) -> "AppData":
@@ -317,6 +351,9 @@ class AppData:
         lists = d.get("lists", [])
         tasks = d.get("tasks", [])
         tags = d.get("tags", [])
+        notes = d.get("notes", [])
+        if not isinstance(notes, list):
+            notes = []
         if not isinstance(lists, list) or not isinstance(tasks, list):
             raise ValueError("lists and tasks must be arrays")
         if not isinstance(tags, list):
@@ -326,6 +363,7 @@ class AppData:
             lists=[TaskList.from_dict(x) for x in lists],
             tasks=[Task.from_dict(x) for x in tasks],
             tags=[Tag.from_dict(x) for x in tags if isinstance(x, dict)],
+            notes=[Note.from_dict(x) for x in notes if isinstance(x, dict)],
             schema_version=int(d.get("schema_version", SCHEMA_VERSION)),
             extra=_split(d, cls.KEYS),
         )
@@ -343,5 +381,6 @@ class AppData:
         out.update(schema_version=self.schema_version, settings=self.settings.to_dict(),
                    lists=[l.to_dict() for l in self.lists],
                    tasks=[t.to_dict() for t in self.tasks],
-                   tags=[g.to_dict() for g in self.tags])
+                   tags=[g.to_dict() for g in self.tags],
+                   notes=[n.to_dict() for n in self.notes])
         return out

@@ -35,6 +35,10 @@ ICONS = {
     "check": "checkmark", "chevron": "chevron_down", "chevronR": "chevron_right",
     "close": "dismiss", "delete": "delete", "edit": "edit",
     "grip": "re_order_dots_vertical",
+    # Notes tab, top bar and the notes' editing toolbar
+    "history": "history", "search": "search", "pin": "pin", "pinOff": "pin_off",
+    "bold": "text_bold", "italic": "text_italic", "link": "link", "rule": "line_horizontal_1",
+    "bullets": "text_bullet_list_ltr", "checkbox": "checkbox_unchecked",
 }
 
 
