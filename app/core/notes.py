@@ -79,19 +79,39 @@ def matches(body: str, query: str, tag_names: list[str] | None = None) -> bool:
     return all(part in hay for part in q.split())
 
 
+BLANK = "\u00a0"   # a no-break space: markdown keeps a line holding only this, so empty lines show
+
+
 def to_markdown(lines: list[str]) -> str:
-    """Lines -> markdown that keeps the user's line breaks (single newlines would otherwise
-    join into one paragraph): ordinary lines get a hard break."""
-    out = []
+    """Lines -> markdown that shows them as typed, one for one. Markdown would join single
+    newlines into one paragraph and squash any number of empty lines into one gap, so:
+    ordinary lines end with a hard break ("  "), and an empty line becomes a line holding only a
+    no-break space (inside the same paragraph). After a bullet, a separating blank line is added
+    first, so the list ends instead of the next line joining the last bullet."""
+    out: list[str] = []
+    prev = ""                                   # kind of the previous line: plain/blank/bullet/rule
     for i, line in enumerate(lines):
-        nxt = lines[i + 1] if i + 1 < len(lines) else ""
-        plain_line = line.strip() and not BULLET_RE.match(line) and not RULE_RE.match(line)
-        if plain_line and nxt.strip() and not BULLET_RE.match(nxt) and not RULE_RE.match(nxt):
-            out.append(line.rstrip() + "  ")
-        elif RULE_RE.match(line):
+        nxt = lines[i + 1] if i + 1 < len(lines) else None
+        nxt_kind = None if nxt is None else ("rule" if RULE_RE.match(nxt) else "bullet" if BULLET_RE.match(nxt)
+                                             else "blank" if not nxt.strip() else "plain")
+        joins = nxt_kind in ("plain", "blank")  # the next line continues this paragraph
+        if RULE_RE.match(line):
             out.extend(["", "---", ""])          # a rule needs blank lines around it
-        else:
+            kind = "rule"
+        elif BULLET_RE.match(line):
             out.append(line)
+            kind = "bullet"
+        elif not line.strip():
+            if prev == "bullet":
+                out.append("")                  # ends the list (Qt adds no gap after a list)
+            out.append(BLANK + ("  " if joins else ""))
+            kind = "blank"
+        else:
+            if prev == "bullet":
+                out.append("")                  # don't let it join the last bullet
+            out.append(line.rstrip() + ("  " if joins else ""))
+            kind = "plain"
+        prev = kind
     return "\n".join(out)
 
 
@@ -99,23 +119,25 @@ def blocks(body: str, title_first: bool = False) -> list[dict]:
     """Reading-view blocks, in order:
     {"kind": "title", "text"}                       (title_first: the first non-empty line)
     {"kind": "md", "markdown"}                       a run of ordinary lines (bullets, rules...)
-    {"kind": "check", "line", "done", "markdown", "indent"}  one checkbox line (line = its index)"""
+    {"kind": "check", "line", "done", "markdown", "indent"}  one checkbox line (line = its index)
+    Empty lines are kept (they show as empty lines), except at the very end."""
     lines = body.splitlines()
+    while lines and not lines[-1].strip():
+        lines.pop()
     out: list[dict] = []
     run: list[str] = []
 
     def flush():
-        while run and not run[-1].strip():
-            run.pop()
-        if any(r.strip() for r in run):
+        if run:
             out.append({"kind": "md", "markdown": to_markdown(run)})
         run.clear()
 
     titled = not title_first
     for i, line in enumerate(lines):
-        if not titled and line.strip():
-            titled = True
-            out.append({"kind": "title", "text": line_text(line) or line.strip()})
+        if not titled:
+            if line.strip():
+                titled = True
+                out.append({"kind": "title", "text": line_text(line) or line.strip()})
             continue
         m = CHECK_RE.match(line)
         if m:

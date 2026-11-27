@@ -83,6 +83,20 @@ def test_blocks_split_checks_from_markdown():
     assert [x["kind"] for x in md.blocks("Just text\n[ ] x")] == ["md", "check"]   # no title
 
 
+def test_blank_lines_are_kept():
+    nb = md.BLANK
+    # Two empty lines between paragraphs stay two empty lines (markdown would squash them).
+    assert md.to_markdown(["One", "", "", "Two"]) == f"One  \n{nb}  \n{nb}  \nTwo"
+    # After a bullet, an empty line ends the list; a plain line never joins the last bullet.
+    assert md.to_markdown(["- a", "", "Text"]) == f"- a\n\n{nb}  \nText"
+    assert md.to_markdown(["- a", "Text"]) == "- a\n\nText"
+    # Gaps between title and body, and around checkboxes, show; trailing ones don't.
+    b = md.blocks("Title\n\nBody\n\n[ ] x\n\n\n", title_first=True)
+    assert [x["kind"] for x in b] == ["title", "md", "check"]
+    assert b[1]["markdown"] == f"{nb}  \nBody  \n{nb}"
+    assert md.blocks("[ ] a\n\n[ ] b")[1] == {"kind": "md", "markdown": nb}
+
+
 def test_safe_links_only():
     assert md.safe_link("https://example.com") and md.safe_link("mailto:a@b.c")
     assert not md.safe_link("file:///C:/Windows") and not md.safe_link("javascript:alert(1)")
