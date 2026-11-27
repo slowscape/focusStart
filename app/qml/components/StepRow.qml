@@ -27,9 +27,18 @@ Item {
         spacing: Theme.s2
         CheckCircle {
             id: check
+            visible: !label.editing
             diameter: 18
             Layout.alignment: Qt.AlignVCenter
             onToggledOn: row.completed(check)
+        }
+        // While editing, the circle turns into an X: click it to delete the step.
+        DeleteDot {
+            visible: label.editing
+            diameter: 18
+            tip: "Delete step"
+            Layout.alignment: Qt.AlignVCenter
+            onClicked: backend.deleteStep(row.taskId, row.itemId)
         }
         InlineText {
             id: label
@@ -38,6 +47,8 @@ Item {
             pixelSize: Theme.fontBody
             color: drag.dragging ? Theme.accent : Theme.textColor
             onCommitted: (t) => backend.editStep(row.taskId, row.itemId, t)
+            deleteWhenEmptied: true
+            onEmptied: backend.deleteStep(row.taskId, row.itemId)
             ReorderArea {
                 id: drag
                 anchors.fill: parent

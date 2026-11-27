@@ -114,10 +114,15 @@ the owner changed several things after trying the app (listed under "Decisions")
   have task notes only. The finished-task page lists completed steps with their notes.
 - No truncation of task or step text anywhere (cards grow; the editor title wraps). Only the Focus
   step text shrinks to fit its fixed area.
-- Cards (My Day, Lists): click the title or a step to edit its words in place (`InlineText`); drag
-  them to reorder; the card's edge/empty space is a `ReorderArea` too (click = open Focus without
-  the timer, drag = move the card; added after reordering "went missing" once titles became
-  click-to-edit); the progress ring opens Focus without the timer; the play arrow opens Focus and starts it. "+ Step" (right, greyed) adds steps in the card,
+- Cards (My Day, Lists): a quick press on the title opens Focus without the timer; press and hold
+  (~0.5 s, `ReorderArea.longPressEnabled`) renames it in place (`InlineText`). A quick press on a
+  step edits it; Enter on an emptied step deletes it (`InlineText.deleteWhenEmptied`; clicking away
+  from an emptied field cancels instead). While a step is being edited, its circle
+  turns into an X (`DeleteDot`, same footprint as CheckCircle, never takes focus) that deletes it;
+  tasks get no X (delete via the "..." menu). The edit box keeps the text where the label had it
+  (its padding spills outside, row height unchanged).
+  Dragging the title, a step, or the card's edge/empty space reorders; the edge/empty space also
+  opens Focus on a click; the progress ring opens Focus without the timer; the play arrow opens Focus and starts it. "+ Step" (right, greyed) adds steps in the card,
   on the same line as "Completed (N)" (left). Focus: click the title or the big step text to edit.
   My Day's Done pills open History.
 - Lists tab uses the same TaskCard as My Day. Its quick-add has Tomorrow/calendar (default: no date)

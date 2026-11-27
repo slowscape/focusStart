@@ -5,7 +5,9 @@ import "../theme"
 
 // Task card (My Day and Lists). Nothing is cut short: the card grows to show the whole
 // title and every remaining step.
-//   click the title or a step  -> edit its words in place
+//   click the title -> open Focus (timer not started); press and hold it -> rename in place
+//   click a step    -> edit its words in place; Enter on an emptied step deletes it
+//   while a step is being edited, its circle turns into an X that deletes it (tasks: "..." menu)
 //   drag the title / a step    -> reorder cards / steps
 //   click the card's edge or its progress ring -> open Focus (timer not started)
 //   drag the card's edge / empty space         -> reorder cards
@@ -107,12 +109,14 @@ Rectangle {
                     id: titleDrag
                     anchors.fill: parent
                     enabled: !titleText.editing
-                    cursorShape: dragging ? Qt.ClosedHandCursor : Qt.IBeamCursor
+                    cursorShape: dragging ? Qt.ClosedHandCursor : Qt.PointingHandCursor
+                    longPressEnabled: true
+                    onLongPressed: titleText.start()
                     row: card
                     view: card.ListView.view
                     index: card.index
                     indicator: card.ListView.view ? (card.ListView.view.dropLine || null) : null
-                    onTapped: titleText.start()
+                    onTapped: appWindow.openFocus(card.itemId, false, true)
                     onDropped: (from, to) => card.reorder(from, to)
                 }
                 ToolTip.visible: titleDrag.containsMouse && !titleDrag.dragging && card.tagNames.length > 0

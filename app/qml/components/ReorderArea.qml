@@ -18,6 +18,17 @@ MouseArea {
     property real offset: 0
     signal tapped()
     signal dropped(int from, int to)
+    // Hold still for `longPressMs` (when something listens: `longPressEnabled`): longPressed()
+    // instead of tapped(). Moving first still drags.
+    property bool longPressEnabled: false
+    property int longPressMs: 500
+    signal longPressed()
+    property bool _longFired: false
+    Timer {
+        id: holdTimer
+        interval: ra.longPressMs
+        onTriggered: if (ra.pressed && !ra._dragging) { ra._longFired = true; ra.longPressed() }
+    }
 
     property bool _dragging: false
     property real _startY: 0
@@ -42,11 +53,14 @@ MouseArea {
         return i
     }
 
-    onPressed: (m) => { _startY = _contentY(m); _dragging = false }
+    onPressed: (m) => {
+        _startY = _contentY(m); _dragging = false; _longFired = false
+        if (longPressEnabled) holdTimer.restart()
+    }
     onPositionChanged: (m) => {
         if (!pressed || !view || !row) return
         var y = _contentY(m)
-        if (!_dragging && Math.abs(y - _startY) > threshold) { _dragging = true; row.z = 100 }
+        if (!_dragging && !_longFired && Math.abs(y - _startY) > threshold) { holdTimer.stop(); _dragging = true; row.z = 100 }
         if (!_dragging) return
         offset = y - _startY
         // Scroll when dragging near the top or bottom edge.
@@ -62,6 +76,8 @@ MouseArea {
         }
     }
     onReleased: {
+        holdTimer.stop()
+        if (_longFired) { _longFired = false; return }      // the long press already acted
         if (_dragging) {
             var from = index, to = _targetIndex()
             _reset()
@@ -70,5 +86,5 @@ MouseArea {
             tapped()
         }
     }
-    onCanceled: _reset()
+    onCanceled: { holdTimer.stop(); _longFired = false; _reset() }
 }
