@@ -199,6 +199,9 @@ the owner changed several things after trying the app (listed under "Decisions")
   text transforms live in `core/notes.py` (tested); QML calls them via `backend.md*`. Reading uses
   `MarkdownView` (Qt's `Text.MarkdownText` per run of lines, checkbox lines as rows with a
   CheckCircle that ticks and saves); links open only for http(s)/mailto (`backend.openLink`).
+  Reading text is selectable (`SelectableText`: read-only TextEdit, drag/double-click, Ctrl+C,
+  right-click Copy / Select all; `persistentSelection` so the menu doesn't clear it). Selection
+  stays within one block (title, a run of lines, or a checkbox line).
   `NotesArea` has its own label row with an Edit/Done button (`EditToggle`) and shows the reading
   view unless editing; changing task/step leaves edit mode. Enter continues bullets and checkboxes.
 - Positive-only guardrails from SPEC.md section 9 still apply (no streaks, overdue, red, guilt copy).
